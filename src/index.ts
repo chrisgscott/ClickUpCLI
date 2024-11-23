@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import addCommand from './commands/add.js';
-import exportCommand from './commands/export.js';
-import configCommand from './commands/config.js';
-import listCommand from './commands/list.js';
-import updateCommand from './commands/update.js';
+import { add } from './commands/add.js';
+import { list } from './commands/list.js';
+import { update } from './commands/update.js';
+import { exportCmd } from './commands/export.js';
+import { get } from './commands/get.js';
 
 const program = new Command();
 
 program
   .name('task')
-  .description('CLI to manage ClickUp tasks')
-  .version('1.0.2');
+  .description('A CLI tool for managing tasks')
+  .version('1.0.5');
 
-// Add commands
-addCommand(program);
-configCommand(program);
-exportCommand(program);
-listCommand(program);
-updateCommand(program);
+program
+  .addCommand(add)
+  .addCommand(list)
+  .addCommand(update)
+  .addCommand(exportCmd)
+  .addCommand(get);
 
-program.parse();
+program.parse(process.argv);

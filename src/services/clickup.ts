@@ -2,7 +2,7 @@ import axios from 'axios';
 import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Config, Task, Priority, TaskStatus } from '../types/clickup.js';
+import { Config, Priority, Task, TaskStatus, UpdateTaskParams } from '../types/clickup.js';
 import { getConfig } from '../config/store.js';
 
 const CONFIG_FILE = join(homedir(), '.task-cli', 'config.json');
@@ -38,26 +38,34 @@ const makeRequest = async <T>(request: () => Promise<T>): Promise<T> => {
   throw new Error('Max retries exceeded');
 };
 
+// Priority mapping based on ClickUp's API
+export const PRIORITY_MAP: { [key: number]: Priority } = {
+  1: { id: "1", priority: "urgent", color: "#f50000", orderindex: "1" },
+  2: { id: "2", priority: "high", color: "#ffcc00", orderindex: "2" },
+  3: { id: "3", priority: "normal", color: "#6fddff", orderindex: "3" },
+  4: { id: "4", priority: "low", color: "#d8d8d8", orderindex: "4" }
+};
+
 export async function createTask(
   name: string,
   description?: string,
-  priority?: number,
-  status?: string
+  listId?: string,
+  priority?: number
 ): Promise<Task> {
   const config = await getConfig();
-  const { token, defaultList } = config.clickup;
+  const { token } = config.clickup;
 
-  if (!defaultList) {
+  if (!listId) {
     throw new Error('No list ID specified. Please set a default list or provide a list ID.');
   }
 
   const response = await axios.post<Task>(
-    `${BASE_URL}/list/${defaultList}/task`,
+    `${BASE_URL}/list/${listId}/task`,
     {
       name,
       description,
       priority: priority || undefined,
-      status: status || undefined
+      status: undefined
     },
     {
       headers: {
@@ -77,23 +85,25 @@ export async function createSubtask(
   priority?: number,
   status?: string
 ): Promise<Task> {
-  const config = await getConfig();
-  const { token } = config.clickup;
+  const axiosInstance = await getAxiosInstance();
+  
+  // First get the parent task to get its list ID
+  const parentTask = await getTask(parentId);
+  if (!parentTask.list?.id) {
+    throw new Error('Parent task does not have a valid list ID');
+  }
 
-  const response = await axios.post<Task>(
-    `${BASE_URL}/task/${parentId}/subtask`,
-    {
-      name,
-      description,
-      priority: priority || undefined,
-      status: status || undefined
-    },
-    {
-      headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json'
-      }
-    }
+  const payload = {
+    name,
+    description,
+    parent: parentId,  
+    priority: priority,
+    status: status
+  };
+
+  const response = await axiosInstance.post<Task>(
+    `/list/${parentTask.list.id}/task`,
+    payload
   );
 
   return response.data;
@@ -112,57 +122,89 @@ export async function listTasks(listId?: string): Promise<Task[]> {
     tasks: Task[];
   }
 
-  const response = await axios.get<TasksResponse>(
-    `${BASE_URL}/list/${targetListId}/task`,
-    {
-      headers: {
-        'Authorization': token
-      }
-    }
+  const axiosInstance = await getAxiosInstance();
+  
+  // Get all tasks including subtasks
+  const query = new URLSearchParams({
+    subtasks: 'true',
+    include_closed: 'true',
+    order_by: 'created',
+    reverse: 'true'
+  }).toString();
+
+  const response = await axiosInstance.get<TasksResponse>(
+    `/list/${targetListId}/task?${query}`
   );
 
-  return response.data.tasks;
+  // Create a map of tasks by ID for quick lookup and track subtasks
+  const tasksById = new Map<string, Task>();
+  const subtaskIds = new Set<string>();
+
+  // First pass: Initialize all tasks
+  for (const task of response.data.tasks) {
+    tasksById.set(task.id, { ...task, subtasks: [] });
+    if (task.parent?.id) {
+      subtaskIds.add(task.id);
+    }
+  }
+
+  // Second pass: Build task hierarchy
+  for (const task of response.data.tasks) {
+    if (task.parent?.id) {
+      const parentTask = tasksById.get(task.parent.id);
+      if (parentTask) {
+        parentTask.subtasks = parentTask.subtasks || [];
+        parentTask.subtasks.push(tasksById.get(task.id)!);
+      }
+    }
+  }
+
+  // Get root tasks (tasks that are not subtasks)
+  const rootTasks = Array.from(tasksById.values()).filter(task => !subtaskIds.has(task.id));
+
+  // Sort root tasks by creation date (newest first)
+  rootTasks.sort((a, b) => {
+    const aDate = new Date(a.date_created || 0);
+    const bDate = new Date(b.date_created || 0);
+    return bDate.getTime() - aDate.getTime();
+  });
+
+  return rootTasks;
 }
 
 export async function getTask(taskId: string): Promise<Task> {
-  const config = await getConfig();
-  const { token } = config.clickup;
+  const axiosInstance = await getAxiosInstance();
+  
+  // Get task details including subtasks
+  const query = new URLSearchParams({
+    include_subtasks: 'true',
+    custom_fields: 'true'
+  }).toString();
 
-  const response = await axios.get<Task>(
-    `${BASE_URL}/task/${taskId}`,
-    {
-      headers: {
-        'Authorization': token
-      }
-    }
+  const response = await axiosInstance.get<Task>(
+    `/task/${taskId}?${query}`
   );
 
   return response.data;
-}
-
-interface UpdateTaskParams {
-  name?: string;
-  description?: string;
-  priority?: number;
-  status?: string;
 }
 
 export async function updateTask(taskId: string, updates: UpdateTaskParams): Promise<Task> {
   const config = await getConfig();
   const { token } = config.clickup;
 
-  const updateData: any = { ...updates };
-  if (updates.priority !== undefined) {
-    updateData.priority = { priority: updates.priority };
-  }
+  // Ensure updates are sent in the correct format
+  const requestBody = {
+    ...updates,
+    priority: updates.priority
+  };
 
   const response = await axios.put<Task>(
     `${BASE_URL}/task/${taskId}`,
-    updateData,
+    requestBody,
     {
       headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        Authorization: token
       }
     }
   );

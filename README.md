@@ -5,11 +5,12 @@ A command-line interface tool for managing ClickUp tasks directly from your term
 ## Features
 
 - 🚀 Create and manage tasks from the command line
-- 📋 Create and manage subtasks
+- 📋 Create and manage subtasks with proper task hierarchy
 - 🔄 Interactive task creation and updates
 - 📝 Task templates for common workflows
 - 🎯 Priority and status management
-- 🔍 List and filter tasks
+- 🔍 List and filter tasks with hierarchical display
+- 📊 Detailed task view with subtask information
 - ⚡️ Fast and user-friendly interface
 
 ## Installation
@@ -32,8 +33,11 @@ npm install -g @chrisgscott/task-cli
 ### Task Management
 
 ```bash
-# List all tasks
+# List all tasks (now with hierarchical subtask display)
 task list
+
+# Get detailed information about a specific task
+task get TASK_ID
 
 # Create a new task
 task add "New feature implementation"
@@ -46,6 +50,9 @@ task add "Implement auth" -t PARENT_TASK_ID
 
 # Update a task
 task update TASK_ID
+
+# List tasks with subtasks
+task list --include-subtasks
 
 # List subtasks
 task list -t TASK_ID

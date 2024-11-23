@@ -7,13 +7,31 @@ export interface Config {
   };
 }
 
+export interface TaskStatus {
+  status: string;
+  type: string;
+  color?: string;
+  orderindex?: number;
+}
+
+export interface Priority {
+  id: string;
+  priority: string;
+  color: string;
+  orderindex: string;
+}
+
 export interface Task {
   id: string;
   name: string;
   description?: string;
   status: TaskStatus;
   priority: Priority;
-  parent: string | null;
+  url: string;
+  parent?: {
+    id: string;
+  };
+  subtasks?: Task[];
   list: {
     id: string;
   };
@@ -22,18 +40,14 @@ export interface Task {
     name: string;
     private: boolean;
   };
+  date_created?: string;
 }
 
-export interface Priority {
-  priority: number;
-  color: string;
-}
-
-export interface TaskStatus {
-  status: string;
-  color: string;
-  type: string;
-  orderindex: number;
+export interface UpdateTaskParams {
+  name?: string;
+  description?: string;
+  priority?: number;
+  status?: string;
 }
 
 export interface Workspace {
@@ -46,11 +60,4 @@ export interface Space {
   id: string;
   name: string;
   private: boolean;
-}
-
-export interface List {
-  id: string;
-  name: string;
-  content: string;
-  status: TaskStatus;
 }
