@@ -85,7 +85,7 @@ export async function createSubtask(
     {
       name,
       description,
-      priority: priority ? { priority } : undefined,
+      priority: priority || undefined,
       status: status || undefined
     },
     {

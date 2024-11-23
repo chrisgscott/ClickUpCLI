@@ -50,7 +50,7 @@ describe('ClickUp Service', () => {
         expect.objectContaining({
           name: taskName,
           description: taskDescription,
-          priority: { priority: taskPriority }
+          priority: taskPriority
         }),
         expect.any(Object)
       );
@@ -89,7 +89,7 @@ describe('ClickUp Service', () => {
         expect.objectContaining({
           name: subtaskName,
           description: subtaskDescription,
-          priority: { priority: subtaskPriority }
+          priority: subtaskPriority
         }),
         expect.any(Object)
       );
