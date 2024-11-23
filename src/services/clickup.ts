@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -8,7 +8,7 @@ import { getConfig } from '../config/store.js';
 const CONFIG_FILE = join(homedir(), '.task-cli', 'config.json');
 const BASE_URL = 'https://api.clickup.com/api/v2';
 
-const getAxiosInstance = async (): Promise<AxiosInstance> => {
+const getAxiosInstance = async () => {
   const config = await getConfig();
   return axios.create({
     baseURL: BASE_URL,
@@ -51,7 +51,7 @@ export async function createTask(
     throw new Error('No list ID specified. Please set a default list or provide a list ID.');
   }
 
-  const response = await axios.post(
+  const response = await axios.post<Task>(
     `${BASE_URL}/list/${defaultList}/task`,
     {
       name,
@@ -80,7 +80,7 @@ export async function createSubtask(
   const config = await getConfig();
   const { token } = config.clickup;
 
-  const response = await axios.post(
+  const response = await axios.post<Task>(
     `${BASE_URL}/task/${parentId}/subtask`,
     {
       name,
@@ -108,7 +108,11 @@ export async function listTasks(listId?: string): Promise<Task[]> {
     throw new Error('No list ID specified. Please set a default list or provide a list ID.');
   }
 
-  const response = await axios.get(
+  interface TasksResponse {
+    tasks: Task[];
+  }
+
+  const response = await axios.get<TasksResponse>(
     `${BASE_URL}/list/${targetListId}/task`,
     {
       headers: {
@@ -124,7 +128,7 @@ export async function getTask(taskId: string): Promise<Task> {
   const config = await getConfig();
   const { token } = config.clickup;
 
-  const response = await axios.get(
+  const response = await axios.get<Task>(
     `${BASE_URL}/task/${taskId}`,
     {
       headers: {
@@ -152,7 +156,7 @@ export async function updateTask(taskId: string, updates: UpdateTaskParams): Pro
     updateData.priority = { priority: updates.priority };
   }
 
-  const response = await axios.put(
+  const response = await axios.put<Task>(
     `${BASE_URL}/task/${taskId}`,
     updateData,
     {
@@ -170,7 +174,11 @@ export async function getListStatuses(listId: string): Promise<TaskStatus[]> {
   const config = await getConfig();
   const { token } = config.clickup;
 
-  const response = await axios.get(
+  interface ListResponse {
+    statuses: TaskStatus[];
+  }
+
+  const response = await axios.get<ListResponse>(
     `${BASE_URL}/list/${listId}`,
     {
       headers: {
@@ -185,7 +193,7 @@ export async function getListStatuses(listId: string): Promise<TaskStatus[]> {
 export async function getWorkspaces(): Promise<any[]> {
   const api = await getAxiosInstance();
   return makeRequest(async () => {
-    const response = await api.get('/team');
+    const response = await api.get<{ teams: any[] }>('/team');
     return response.data.teams;
   });
 }
@@ -193,7 +201,7 @@ export async function getWorkspaces(): Promise<any[]> {
 export async function getSpaces(workspaceId: string): Promise<any[]> {
   const api = await getAxiosInstance();
   return makeRequest(async () => {
-    const response = await api.get(`/team/${workspaceId}/space`);
+    const response = await api.get<{ spaces: any[] }>(`/team/${workspaceId}/space`);
     return response.data.spaces;
   });
 }
@@ -201,7 +209,7 @@ export async function getSpaces(workspaceId: string): Promise<any[]> {
 export async function getLists(spaceId: string): Promise<any[]> {
   const api = await getAxiosInstance();
   return makeRequest(async () => {
-    const response = await api.get(`/space/${spaceId}/list`);
+    const response = await api.get<{ lists: any[] }>(`/space/${spaceId}/list`);
     return response.data.lists;
   });
 }
@@ -209,14 +217,7 @@ export async function getLists(spaceId: string): Promise<any[]> {
 export async function listSubtasks(taskId: string): Promise<Task[]> {
   const api = await getAxiosInstance();
   return makeRequest(async () => {
-    // First get the parent task to find its list ID
-    const parentTask = await getTask(taskId);
-    // Then list all tasks in that list and filter by parent
-    const response = await api.get(`/list/${parentTask.list.id}/task`, {
-      params: {
-        parent: taskId
-      }
-    });
+    const response = await api.get<{ tasks: Task[] }>(`/task/${taskId}/subtask`);
     return response.data.tasks;
   });
 }
