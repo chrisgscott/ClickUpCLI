@@ -56,7 +56,7 @@ export async function createTask(
     {
       name,
       description,
-      priority: priority ? { priority } : undefined,
+      priority: priority || undefined,
       status: status || undefined
     },
     {
