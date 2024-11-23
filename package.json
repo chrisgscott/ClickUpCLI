@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "task": "bin/task.js"
+    "task": "./bin/task.js"
   },
   "files": [
     "dist",
@@ -35,12 +35,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chrisgscott/task-cli.git"
+    "url": "https://github.com/chrisgscott/ClickUpCLI.git"
   },
   "bugs": {
-    "url": "https://github.com/chrisgscott/task-cli/issues"
+    "url": "https://github.com/chrisgscott/ClickUpCLI/issues"
   },
-  "homepage": "https://github.com/chrisgscott/task-cli#readme",
+  "homepage": "https://github.com/chrisgscott/ClickUpCLI#readme",
   "engines": {
     "node": ">=14.0.0"
   },
