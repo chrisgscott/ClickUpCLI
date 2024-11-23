@@ -47,9 +47,9 @@ export const PRIORITY_MAP: { [key: number]: Priority } = {
 };
 
 export async function createTask(
+  listId: string,
   name: string,
   description?: string,
-  listId?: string,
   priority?: number
 ): Promise<Task> {
   const config = await getConfig();
@@ -59,19 +59,14 @@ export async function createTask(
     throw new Error('No list ID specified. Please set a default list or provide a list ID.');
   }
 
-  const response = await axios.post<Task>(
-    `${BASE_URL}/list/${listId}/task`,
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.post<Task>(
+    `/list/${listId}/task`,
     {
       name,
       description,
       priority: priority || undefined,
       status: undefined
-    },
-    {
-      headers: {
-        'Authorization': token,
-        'Content-Type': 'application/json'
-      }
     }
   );
 
