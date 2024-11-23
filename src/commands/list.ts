@@ -1,51 +1,48 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { listTasks, getTask } from '../services/clickup.js';
-import { Task } from '../types/clickup.js';
+import { listTasks } from '../services/clickup.js';
+import { getConfig } from '../config/store.js';
 
-export const listCommand = new Command('list')
-  .description('List tasks')
-  .option('-l, --list <id>', 'List ID to fetch tasks from')
-  .option('-t, --task <id>', 'Task ID to list subtasks for')
-  .action(async (options) => {
-    try {
-      let tasks: Task[];
+export default function listCommand(program: Command) {
+  program
+    .command('list')
+    .description('List all tasks')
+    .option('-l, --list <id>', 'List ID (overrides default)')
+    .action(async (options) => {
+      try {
+        const config = await getConfig();
+        const listId = options.list || config.clickup.defaultList;
 
-      if (options.task) {
-        // List subtasks for a specific task
-        const parentTask = await getTask(options.task);
-        tasks = await listTasks(parentTask.list.id);
-        tasks = tasks.filter(task => task.parent === options.task);
-        
-        console.log(chalk.blue(`\nSubtasks for task ${options.task}:\n`));
-      } else {
-        // List all tasks in the list
-        tasks = await listTasks(options.list);
+        if (!listId) {
+          console.error(chalk.red('No list ID provided. Please run "task config --interactive" first.'));
+          process.exit(1);
+        }
+
+        const tasks = await listTasks(listId);
+
+        if (tasks.length === 0) {
+          console.log(chalk.yellow('\nNo tasks found.'));
+          return;
+        }
+
+        console.log(chalk.blue('\nTasks:'));
+        tasks.forEach(task => {
+          console.log(chalk.white('\n-----------------------------------'));
+          console.log(chalk.white(`Name: ${task.name}`));
+          if (task.description) {
+            console.log(chalk.white(`Description: ${task.description}`));
+          }
+          console.log(chalk.white(`Status: ${task.status.status}`));
+          console.log(chalk.white(`Priority: ${task.priority.priority}`));
+          if (task.parent) {
+            console.log(chalk.white(`Parent Task: ${task.parent}`));
+          }
+        });
+        console.log(chalk.white('\n-----------------------------------\n'));
+
+      } catch (error) {
+        console.error(chalk.red('Error listing tasks:'), error);
+        process.exit(1);
       }
-
-      if (!tasks.length) {
-        console.log(chalk.yellow('No tasks found.'));
-        return;
-      }
-
-      console.log('\nTasks:');
-      tasks.forEach((task, index) => {
-        const priorityMap: Record<number, string> = {
-          1: '🔴',
-          2: '🟡',
-          3: '🟢',
-          4: '⚪️'
-        };
-
-        const priority = priorityMap[task.priority.priority] || '⚪️';
-        console.log(
-          `${index + 1}. [${task.id}] ${task.name} (${task.status.status}) [P${priority}]`
-        );
-      });
-      console.log();
-
-    } catch (error) {
-      console.error(chalk.red('Error listing tasks:'), error);
-      process.exit(1);
-    }
-  });
+    });
+}

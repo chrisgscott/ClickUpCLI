@@ -1,6 +1,6 @@
 {
   "name": "@chrisgscott/task-cli",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A CLI tool for managing ClickUp tasks from the terminal",
   "type": "module",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
     "prepublishOnly": "npm test",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist",
-    "postinstall": "node ./dist/scripts/setup.js"
+    "setup": "node ./dist/scripts/setup.js"
   },
   "keywords": [
     "cli",

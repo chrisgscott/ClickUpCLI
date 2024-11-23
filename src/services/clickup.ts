@@ -136,13 +136,25 @@ export async function getTask(taskId: string): Promise<Task> {
   return response.data;
 }
 
-export async function updateTask(taskId: string, updates: Partial<Task>): Promise<Task> {
+interface UpdateTaskParams {
+  name?: string;
+  description?: string;
+  priority?: number;
+  status?: string;
+}
+
+export async function updateTask(taskId: string, updates: UpdateTaskParams): Promise<Task> {
   const config = await getConfig();
   const { token } = config.clickup;
 
+  const updateData: any = { ...updates };
+  if (updates.priority !== undefined) {
+    updateData.priority = { priority: updates.priority };
+  }
+
   const response = await axios.put(
     `${BASE_URL}/task/${taskId}`,
-    updates,
+    updateData,
     {
       headers: {
         'Authorization': token,

@@ -1,83 +1,78 @@
 import { Command } from 'commander';
+import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { getTask, updateTask } from '../services/clickup.js';
-import { Task, TaskStatus } from '../types/clickup.js';
 
-export const updateCommand = new Command('update')
-  .description('Update a task')
-  .argument('<id>', 'Task ID')
-  .option('-n, --name <name>', 'New task name')
-  .option('-d, --description <description>', 'New task description')
-  .option('-p, --priority <priority>', 'New task priority (1-4)')
-  .option('-s, --status <status>', 'New task status')
-  .action(async (id: string, options) => {
-    try {
-      // Get current task to preserve existing values
-      const currentTask = await getTask(id);
-      
-      const updates: Partial<Task> = {};
-      
-      if (options.name) {
-        updates.name = options.name;
-      }
-      
-      if (options.description) {
-        updates.description = options.description;
-      }
-      
-      if (options.priority) {
-        const priority = parseInt(options.priority);
-        if (isNaN(priority) || priority < 1 || priority > 4) {
-          throw new Error('Priority must be a number between 1 and 4');
+export default function updateCommand(program: Command) {
+  program
+    .command('update')
+    .description('Update a task')
+    .argument('<id>', 'Task ID')
+    .option('-n, --name <name>', 'New task name')
+    .option('-d, --description <description>', 'New task description')
+    .option('-p, --priority <priority>', 'New task priority (1-4)')
+    .option('-s, --status <status>', 'New task status')
+    .action(async (id, options) => {
+      try {
+        const task = await getTask(id);
+        
+        if (!options.name && !options.description && !options.priority && !options.status) {
+          const answers = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'name',
+              message: 'New task name (leave empty to keep current):',
+              default: task.name
+            },
+            {
+              type: 'input',
+              name: 'description',
+              message: 'New task description (leave empty to keep current):',
+              default: task.description
+            },
+            {
+              type: 'list',
+              name: 'priority',
+              message: 'New task priority:',
+              choices: [
+                { name: 'Urgent', value: '1' },
+                { name: 'High', value: '2' },
+                { name: 'Normal', value: '3' },
+                { name: 'Low', value: '4' }
+              ],
+              default: task.priority.priority.toString()
+            },
+            {
+              type: 'input',
+              name: 'status',
+              message: 'New task status (leave empty to keep current):',
+              default: task.status.status
+            }
+          ]);
+
+          options.name = answers.name !== task.name ? answers.name : undefined;
+          options.description = answers.description !== task.description ? answers.description : undefined;
+          options.priority = answers.priority !== task.priority.priority.toString() ? answers.priority : undefined;
+          options.status = answers.status !== task.status.status ? answers.status : undefined;
         }
-        updates.priority = {
-          priority,
-          color: currentTask.priority.color
-        };
-      }
-      
-      if (options.status) {
-        const newStatus: TaskStatus = {
-          status: options.status,
-          color: currentTask.status.color,
-          type: currentTask.status.type,
-          orderindex: currentTask.status.orderindex
-        };
-        updates.status = newStatus;
-      }
 
-      const updatedTask = await updateTask(id, updates);
-      
-      console.log(chalk.green('✓ Task updated successfully:'));
-      console.log(`ID: ${updatedTask.id}`);
-      console.log(`Name: ${updatedTask.name}`);
-      console.log(`Status: ${updatedTask.status.status}`);
-      if (updatedTask.description) {
-        console.log(`Description: ${updatedTask.description}`);
-      }
-      console.log(`Priority: ${getPriorityLabel(updatedTask.priority.priority)}`);
-      if (updatedTask.parent) {
-        console.log(`Parent Task: ${updatedTask.parent}`);
-      }
-      console.log();
+        const updatedTask = await updateTask(id, {
+          name: options.name,
+          description: options.description,
+          priority: options.priority ? parseInt(options.priority) : undefined,
+          status: options.status
+        });
 
-    } catch (error) {
-      console.error(chalk.red('Error updating task:'), error);
-      process.exit(1);
-    }
-  });
+        console.log(chalk.green('\n✓ Task updated successfully!'));
+        console.log(chalk.blue('\nUpdated task details:'));
+        console.log(chalk.white(`Name: ${updatedTask.name}`));
+        console.log(chalk.white(`Description: ${updatedTask.description || 'N/A'}`));
+        console.log(chalk.white(`Priority: ${updatedTask.priority.priority}`));
+        console.log(chalk.white(`Status: ${updatedTask.status.status}`));
 
-function getPriorityLabel(priority: number): string {
-  switch (priority) {
-    case 1:
-      return 'urgent';
-    case 2:
-      return 'high';
-    case 3:
-      return 'normal';
-    case 4:
-      return 'low';
-    default:
-      return 'normal';
-  }
+      } catch (error) {
+        console.error(chalk.red('Error updating task:'), error);
+        process.exit(1);
+      }
+    });
 }

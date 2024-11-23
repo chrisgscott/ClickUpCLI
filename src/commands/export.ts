@@ -1,102 +1,50 @@
 import { Command } from 'commander';
-import { promises as fs } from 'fs';
-import { join } from 'path';
 import chalk from 'chalk';
-import { listTasks, getTask } from '../services/clickup.js';
-import { Task } from '../types/clickup.js';
+import { promises as fs } from 'fs';
+import { listTasks } from '../services/clickup.js';
+import { getConfig } from '../config/store.js';
 
-export const exportCommand = new Command('export')
-  .description('Export tasks to various formats')
-  .option('-l, --list <id>', 'List ID to export tasks from')
-  .option('-o, --output <path>', 'Output file path', 'TASKS.md')
-  .option('--format <format>', 'Export format (markdown)', 'markdown')
-  .option('--include-completed', 'Include completed tasks', false)
-  .action(async (options) => {
-    try {
-      const tasks = await listTasks(options.list);
-      if (!tasks.length) {
-        console.log(chalk.yellow('No tasks found in the specified list.'));
-        return;
-      }
+export default function exportCommand(program: Command) {
+  program
+    .command('export')
+    .description('Export tasks to a markdown file')
+    .option('-o, --output <file>', 'Output file path', 'tasks.md')
+    .option('-l, --list <id>', 'List ID (overrides default)')
+    .action(async (options) => {
+      try {
+        const config = await getConfig();
+        const listId = options.list || config.clickup.defaultList;
 
-      const taskTree = new Map<string, Task>();
-      const subtaskMap = new Map<string, Task[]>();
-
-      // First pass: collect all tasks and create maps
-      for (const task of tasks) {
-        if (task.parent && !options.includeCompleted && task.status.status.toLowerCase() === 'complete') {
-          continue;
-        }
-        
-        if (task.parent) {
-          const subtasks = subtaskMap.get(task.parent) || [];
-          subtasks.push(task);
-          subtaskMap.set(task.parent, subtasks);
-        } else {
-          taskTree.set(task.id, task);
-        }
-      }
-
-      let markdown = '# Task List\n\n';
-      
-      // Generate markdown for each parent task and its subtasks
-      for (const [_, parentTask] of taskTree) {
-        if (!options.includeCompleted && parentTask.status.status.toLowerCase() === 'complete') {
-          continue;
+        if (!listId) {
+          console.error(chalk.red('No list ID provided. Please run "task config --interactive" first.'));
+          process.exit(1);
         }
 
-        const priorityMap: Record<number, string> = {
-          1: '🔴',
-          2: '🟡',
-          3: '🟢',
-          4: '⚪️'
-        };
+        const tasks = await listTasks(listId);
 
-        const priority = priorityMap[parentTask.priority.priority] || '⚪️';
-        
-        markdown += `## ${priority} ${parentTask.name}\n`;
-        markdown += `**Status:** ${parentTask.status.status}\n`;
-        if (parentTask.description) {
-          markdown += `\n${parentTask.description}\n`;
-        }
+        let markdown = '# Tasks\n\n';
 
-        const subtasks = subtaskMap.get(parentTask.id) || [];
-        if (subtasks.length > 0) {
-          markdown += '\n### Subtasks\n';
-          for (const subtask of subtasks) {
-            const subtaskPriority = priorityMap[subtask.priority.priority] || '⚪️';
-            markdown += `- ${subtaskPriority} ${subtask.name} (${subtask.status.status})\n`;
-            if (subtask.description) {
-              markdown += `  > ${subtask.description.replace(/\n/g, '\n  > ')}\n`;
-            }
+        tasks.forEach(task => {
+          // Main task
+          markdown += `## ${task.name}\n\n`;
+          if (task.description) {
+            markdown += `${task.description}\n\n`;
           }
-        }
+          markdown += `- Status: ${task.status.status}\n`;
+          markdown += `- Priority: ${task.priority.priority}\n`;
+          markdown += `- ID: ${task.id}\n`;
+          if (task.parent) {
+            markdown += `- Parent Task: ${task.parent}\n`;
+          }
+          markdown += '\n---\n\n';
+        });
 
-        markdown += '\n---\n\n';
+        await fs.writeFile(options.output, markdown);
+        console.log(chalk.green(`\n✓ Tasks exported to ${options.output}`));
+
+      } catch (error) {
+        console.error(chalk.red('Error exporting tasks:'), error);
+        process.exit(1);
       }
-
-      // Add metadata
-      markdown += '\n## Metadata\n';
-      markdown += `- Exported: ${new Date().toISOString()}\n`;
-      markdown += `- List ID: ${options.list}\n`;
-      markdown += `- Total Tasks: ${taskTree.size}\n`;
-      markdown += `- Total Subtasks: ${Array.from(subtaskMap.values()).reduce((acc, curr) => acc + curr.length, 0)}\n`;
-
-      // Write to file
-      const outputPath = options.output.endsWith('.md') ? options.output : `${options.output}.md`;
-      await fs.writeFile(outputPath, markdown);
-
-      console.log(chalk.green(`✓ Tasks exported successfully to ${outputPath}`));
-      
-      // If the file is in a git repository, suggest adding to .gitignore
-      if (!outputPath.includes('..') && !outputPath.startsWith('/')) {
-        console.log(chalk.blue('\nTip: If you want to keep this file in sync with ClickUp,'));
-        console.log(chalk.blue('you might want to add it to .gitignore:'));
-        console.log(chalk.white(`\necho "${outputPath}" >> .gitignore`));
-      }
-
-    } catch (error) {
-      console.error(chalk.red('Error exporting tasks:'), error);
-      process.exit(1);
-    }
-  });
+    });
+}
