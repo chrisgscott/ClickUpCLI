@@ -10,99 +10,118 @@ import { join } from 'path';
 const CONFIG_DIR = join(homedir(), '.task-cli');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
-export default function configCommand(program: Command) {
-  program
-    .command('config')
-    .description('Configure the CLI')
-    .option('-i, --interactive', 'Interactive configuration mode')
-    .action(async (options) => {
+export const config = new Command('config')
+  .description('Configure the CLI')
+  .option('-i, --interactive', 'Interactive configuration mode')
+  .action(async (options) => {
+    try {
+      // Check if config exists
       try {
-        // Check if config exists
-        try {
-          await fs.access(CONFIG_FILE);
-        } catch {
-          console.log(chalk.yellow('Configuration not found. Running setup...'));
-          const { spawn } = await import('child_process');
-          const setupProcess = spawn('node', ['./dist/scripts/setup.js'], {
-            stdio: 'inherit',
-            cwd: process.cwd()
-          });
-          
-          await new Promise((resolve, reject) => {
-            setupProcess.on('close', (code) => {
-              if (code === 0) {
-                resolve(null);
-              } else {
-                reject(new Error(`Setup process exited with code ${code}`));
-              }
-            });
-          });
-          return;
-        }
-
-        const config = await getConfig();
-
-        if (options.interactive) {
-          const workspaces = await getWorkspaces();
-          
-          const { workspace } = await inquirer.prompt([
-            {
-              type: 'list',
-              name: 'workspace',
-              message: 'Select default workspace:',
-              choices: workspaces.map(w => ({
-                name: w.name,
-                value: w.id
-              }))
-            }
-          ]);
-
-          const spaces = await getSpaces(workspace);
-          const { space } = await inquirer.prompt([
-            {
-              type: 'list',
-              name: 'space',
-              message: 'Select default space:',
-              choices: spaces.map(s => ({
-                name: s.name,
-                value: s.id
-              }))
-            }
-          ]);
-
-          const lists = await getLists(space);
-          const { list } = await inquirer.prompt([
-            {
-              type: 'list',
-              name: 'list',
-              message: 'Select default list:',
-              choices: lists.map(l => ({
-                name: l.name,
-                value: l.id
-              }))
-            }
-          ]);
-
-          await updateConfig({
-            ...config,
-            clickup: {
-              ...config.clickup,
-              defaultWorkspace: workspace,
-              defaultSpace: space,
-              defaultList: list
-            }
-          });
-
-          console.log(chalk.green('\n✓ Configuration updated successfully!'));
-        } else {
-          console.log(chalk.blue('\nCurrent configuration:'));
-          console.log(JSON.stringify(config, null, 2));
-          console.log(chalk.blue('\nTo update configuration interactively, use:'));
-          console.log(chalk.white('  task config --interactive\n'));
-        }
-      } catch (error) {
-        console.error(chalk.red('Error updating configuration:'), error);
-        process.exit(1);
+        await fs.access(CONFIG_FILE);
+      } catch {
+        options.interactive = true;
       }
-    });
-}
+
+      if (options.interactive) {
+        let config;
+        try {
+          config = await getConfig();
+        } catch {
+          config = { clickup: { token: '' } };
+        }
+
+        const answers = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'token',
+            message: 'Enter your ClickUp API token:',
+            default: config.clickup.token,
+            validate: (input: string) => {
+              if (!input.trim()) {
+                return 'API token is required';
+              }
+              return true;
+            }
+          }
+        ]);
+
+        // Update token first to ensure it's valid before fetching workspaces
+        await updateConfig({
+          clickup: {
+            ...config.clickup,
+            token: answers.token
+          }
+        });
+
+        // Fetch workspaces
+        const workspaces = await getWorkspaces();
+        if (!workspaces.length) {
+          console.error(chalk.red('No workspaces found. Please check your API token.'));
+          process.exit(1);
+        }
+
+        const workspaceAnswer = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'workspace',
+            message: 'Select a workspace:',
+            choices: workspaces.map(w => ({ name: w.name, value: w.id })),
+            default: config.clickup.defaultWorkspace
+          }
+        ]);
+
+        // Fetch spaces
+        const spaces = await getSpaces(workspaceAnswer.workspace);
+        const spaceAnswer = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'space',
+            message: 'Select a space:',
+            choices: spaces.map(s => ({ name: s.name, value: s.id })),
+            default: config.clickup.defaultSpace
+          }
+        ]);
+
+        // Fetch lists
+        const lists = await getLists(spaceAnswer.space);
+        const listAnswer = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'list',
+            message: 'Select a default list:',
+            choices: lists.map(l => ({ name: l.name, value: l.id })),
+            default: config.clickup.defaultList
+          }
+        ]);
+
+        // Save all settings
+        await updateConfig({
+          clickup: {
+            token: answers.token,
+            defaultWorkspace: workspaceAnswer.workspace,
+            defaultSpace: spaceAnswer.space,
+            defaultList: listAnswer.list
+          }
+        });
+
+        console.log(chalk.green('\n✓ Configuration saved successfully!'));
+      } else {
+        const config = await getConfig();
+        console.log(chalk.blue('\nCurrent configuration:'));
+        console.log('API Token:', config.clickup.token ? '********' : 'Not set');
+        console.log('Default Workspace:', config.clickup.defaultWorkspace || 'Not set');
+        console.log('Default Space:', config.clickup.defaultSpace || 'Not set');
+        console.log('Default List:', config.clickup.defaultList || 'Not set');
+        console.log('\nUse --interactive or -i to update configuration');
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Error configuring CLI:'), error.message);
+      } else {
+        console.error(chalk.red('Error configuring CLI: An unknown error occurred'));
+      }
+      process.exit(1);
+    }
+  });
+
+export default config;

@@ -50,7 +50,8 @@ export async function createTask(
   listId: string,
   name: string,
   description?: string,
-  priority?: number
+  priority?: number,
+  status?: string
 ): Promise<Task> {
   const config = await getConfig();
   const { token } = config.clickup;
@@ -66,7 +67,7 @@ export async function createTask(
       name,
       description,
       priority: priority || undefined,
-      status: undefined
+      status
     }
   );
 
@@ -205,6 +206,11 @@ export async function updateTask(taskId: string, updates: UpdateTaskParams): Pro
   );
 
   return response.data;
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  const axiosInstance = await getAxiosInstance();
+  await axiosInstance.delete(`/task/${taskId}`);
 }
 
 export async function getListStatuses(listId: string): Promise<TaskStatus[]> {

@@ -1,11 +1,11 @@
 {
   "name": "@chrisgscott/task-cli",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A CLI tool for managing ClickUp tasks from the terminal",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "task": "./bin/task.js"
+    "task": "bin/task.js"
   },
   "files": [
     "dist",
@@ -35,7 +35,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/chrisgscott/ClickUpCLI.git"
+    "url": "git+https://github.com/chrisgscott/ClickUpCLI.git"
   },
   "bugs": {
     "url": "https://github.com/chrisgscott/ClickUpCLI/issues"

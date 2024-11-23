@@ -71,10 +71,21 @@ describe('ClickUp Service', () => {
   });
 
   describe('createTask', () => {
-    it('should create a task with the given parameters', async () => {
+    it('should create a task successfully', async () => {
+      const mockTask = {
+        id: '123',
+        name: 'Test Task',
+        description: 'Test Description',
+        status: { status: 'to do', type: 'custom', color: '#000000' },
+        priority: { id: '1', priority: 'urgent', color: '#f50000', orderindex: '1' },
+        url: 'https://app.clickup.com/123',
+        list: { id: 'list123' },
+        space: { id: 'space123', name: 'Test Space', private: false }
+      };
+
       const mockAxiosInstance = {
         get: jest.fn(),
-        post: jest.fn().mockResolvedValueOnce(createMockResponse(mockTasks[0])),
+        post: jest.fn().mockResolvedValueOnce({ data: mockTask }),
         defaults: {
           headers: {
             common: { 'Accept': 'application/json' }
@@ -84,13 +95,17 @@ describe('ClickUp Service', () => {
 
       mockedAxios.create.mockReturnValue(mockAxiosInstance);
 
-      const result = await createTask('test-list-id', 'Test Task', 'Test Description', 3);
-      expect(result).toEqual(mockTasks[0]);
-      expect(mockAxiosInstance.post).toHaveBeenCalledWith('/list/test-list-id/task', {
-        name: 'Test Task',
-        description: 'Test Description',
-        priority: 3
-      });
+      const result = await createTask('list123', 'Test Task', 'Test Description', 1, 'to do');
+      expect(result).toEqual(mockTask);
+      expect(mockAxiosInstance.post).toHaveBeenCalledWith(
+        '/list/list123/task',
+        {
+          name: 'Test Task',
+          description: 'Test Description',
+          priority: 1,
+          status: 'to do'
+        }
+      );
     });
   });
 
