@@ -8,6 +8,18 @@ jest.mock('axios');
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+const createMockResponse = <T>(data: T) => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: {
+    url: 'https://api.clickup.com/api/v2/mock',
+    method: 'post',
+    headers: {}
+  }
+});
+
 describe('ClickUp Service', () => {
   const mockConfig = {
     clickup: {
@@ -37,7 +49,7 @@ describe('ClickUp Service', () => {
         space: { id: 'test-space-id', name: 'Test Space', private: false }
       };
 
-      mockedAxios.post.mockResolvedValueOnce({ data: mockTask });
+      mockedAxios.post.mockResolvedValueOnce(createMockResponse(mockTask));
 
       const taskName = 'Test Task';
       const taskDescription = 'Test Description';
@@ -70,7 +82,7 @@ describe('ClickUp Service', () => {
         space: { id: 'test-space-id', name: 'Test Space', private: false }
       };
 
-      mockedAxios.post.mockResolvedValueOnce({ data: mockSubtask });
+      mockedAxios.post.mockResolvedValueOnce(createMockResponse(mockSubtask));
 
       const parentId = '123';
       const subtaskName = 'Test Subtask';
@@ -121,7 +133,7 @@ describe('ClickUp Service', () => {
         }
       ];
 
-      mockedAxios.get.mockResolvedValueOnce({ data: { tasks: mockTasks } });
+      mockedAxios.get.mockResolvedValueOnce(createMockResponse({ tasks: mockTasks }));
 
       const tasks = await listTasks();
       expect(tasks).toEqual(mockTasks);
