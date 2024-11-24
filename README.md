@@ -11,6 +11,8 @@ A command-line interface tool for managing ClickUp tasks directly from your term
 - Customize task statuses with colors
 - Fast and user-friendly interface
 - Interactive mode for easier management
+- Bulk configuration management through YAML files
+- Automatic backup creation before applying changes
 
 ## Installation
 
@@ -97,74 +99,109 @@ task export abc123
 task export
 ```
 
-### Tag Management
+### Bulk Configuration Management
 
-#### Managing Tags
-```bash
-# List all tags
-task tag --list
+The CLI supports bulk configuration management through YAML files. You can define tags and tasks in a YAML file and apply them all at once.
 
-# Add a new tag with custom colors
-task tag --add "Feature" --bg "#FF0000" --fg "#FFFFFF"
+#### Supported Configuration Items
 
-# Add a new tag (default colors)
-task tag --add "Bug"
+The following items can be configured via YAML:
 
-# Delete a tag
-task tag --delete "Feature"
+1. **Tags**:
+   - Name (required)
+   - Background color (hex format, e.g., "#FF9900")
+   - Foreground color (hex format, e.g., "#FFFFFF")
 
-# Interactive tag management
-task tag --interactive
+2. **Tasks**:
+   - Name (required)
+   - Description (optional)
+   - Priority (1: urgent, 2: high, 3: normal, 4: low)
+   - Status
+   - Tags (list of tag names)
+   - Due date (format: YYYY-MM-DD)
+   - Assignees (list of assignee IDs)
+
+Note: Some ClickUp features like custom fields, attachments, time tracking, dependencies, and subtasks must be managed through the ClickUp web interface or individual CLI commands.
+
+#### YAML File Structure
+```yaml
+# Define custom tags with colors
+tags:
+  - name: "review"
+    bg_color: "#FF9900"  # Background color
+    fg_color: "#FFFFFF"  # Text color
+  - name: "bug"
+    bg_color: "#FF0000"
+    fg_color: "#FFFFFF"
+  - name: "feature"
+    bg_color: "#00FF00"
+    fg_color: "#000000"
+
+# Define tasks with their properties
+tasks:
+  - name: "Implement user authentication"
+    description: "Add OAuth2 authentication flow for users"
+    priority: 3  # 1: urgent, 2: high, 3: normal, 4: low
+    status: "backlog"
+    due_date: "2024-02-15"  # Optional, format: YYYY-MM-DD
+    tags: ["feature"]  # Optional, reference to defined tags
+    assignees: ["user123"]  # Optional, list of user IDs
 ```
 
-### Status Management
-
-#### Managing Statuses
+#### Applying Configuration
 ```bash
-# List all statuses
-task status --list
+# Apply changes from a YAML file
+task apply --file changes.yml
 
-# Add a new status
-task status --add "In Review" --color "#FFA500"
+# Preview changes without applying them
+task apply --file changes.yml --dry-run
 
-# Add a status with order index
-task status --add "Blocked" --color "#FF0000" --order 3
+# Export current configuration to YAML
+task export --format yaml > current-config.yml
+```
 
-# Update status name and color
-task status --update "In Progress" --name "In Development" --color "#00FF00"
+### Backup Management
 
-# Delete a status
-task status --delete "In Review"
+Backups are automatically created in `~/.task-cli/backups` before applying any changes. Each backup is timestamped and contains the complete configuration at that point.
 
-# Interactive status management
-task status --interactive
+You can restore from a backup using:
+```bash
+# List available backups
+task backup list
+
+# Restore from a specific backup
+task backup restore config-2024-01-01T12-00-00.yml
 ```
 
 ### Configuration
 
-#### Managing Settings
-```bash
-# View current configuration
-task config --show
+The CLI stores its configuration in `~/.task-cli/config.json`. This includes:
+- ClickUp API token
+- Default workspace ID
+- Default space ID
+- Default list ID
+- Custom color schemes
+- Other preferences
 
-# Set default list
-task config --list abc123
+You can update these settings using:
+```bash
+# Set API token
+task config set token YOUR_API_TOKEN
+
+# Set default workspace
+task config set workspace WORKSPACE_ID
 
 # Set default space
-task config --space xyz789
+task config set space SPACE_ID
 
-# Interactive configuration
-task config --interactive
+# Set default list
+task config set list LIST_ID
 ```
 
-## Tips and Tricks
+## Contributing
 
-- Use the `--interactive` flag with any command for a guided experience
-- Tab completion is available for most commands
-- Colors in the terminal indicate priority and status
-- Use `task --help` or `task [command] --help` for detailed command information
-- Tags and statuses support custom colors using hex codes (e.g., "#FF0000")
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.

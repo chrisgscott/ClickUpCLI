@@ -82,9 +82,10 @@ export const update = new Command('update')
       console.log('\nUpdated task details:');
       if (updates.name) console.log(`Name: ${updatedTask.name}`);
       if (updates.description) console.log(`Description: ${updatedTask.description || 'N/A'}`);
-      if (updates.status) console.log(`Status: ${updatedTask.status.status || 'N/A'}`);
+      if (updates.status) console.log(`Status: ${updatedTask.status?.status || 'N/A'}`);
       if (updates.priority) console.log(`Priority: ${updatedTask.priority?.priority || 'N/A'}`);
-      if (updates.tags) console.log(`Tags: ${updatedTask.tags.map(tag => tag.name).join(', ')}`);
+      if (updates.tags) console.log(`Tags: ${updatedTask.tags?.map(tag => tag.name).join(', ') || 'N/A'}`);
+
     } catch (error) {
       console.error(chalk.red('Error updating task:'), error);
       process.exit(1);

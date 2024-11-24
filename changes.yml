@@ -1,0 +1,25 @@
+tags:
+  - name: "review"
+    bg_color: "#FF9900"
+    fg_color: "#FFFFFF"
+  - name: "bug"
+    bg_color: "#FF0000"
+    fg_color: "#FFFFFF"
+  - name: "feature"
+    bg_color: "#00FF00"
+    fg_color: "#000000"
+
+tasks:
+  - name: "Implement user authentication"
+    description: "Add OAuth2 authentication flow for users"
+    priority: 3
+    status: "backlog"
+    due_date: "2024-02-15"
+  - name: "Fix mobile layout issues"
+    description: "Address responsive design problems on small screens"
+    priority: 1
+    status: "in progress"
+  - name: "Add export functionality"
+    description: "Allow users to export data in CSV format"
+    priority: 3
+    status: "backlog"

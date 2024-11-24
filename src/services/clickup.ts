@@ -1,41 +1,18 @@
 import axios from 'axios';
-import { promises as fs } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-import { Config, Priority, Task, TaskStatus, UpdateTaskParams, Tag } from '../types/clickup.js';
+import { Tag, Task, TaskStatus, UpdateTaskParams, Priority, Workspace, Space } from '../types/clickup.js';
 import { getConfig } from '../config/store.js';
 
-const CONFIG_FILE = join(homedir(), '.task-cli', 'config.json');
 const BASE_URL = 'https://api.clickup.com/api/v2';
 
-const getAxiosInstance = async () => {
+const getAxiosInstance = async (): Promise<ReturnType<typeof axios.create>> => {
   const config = await getConfig();
   return axios.create({
     baseURL: BASE_URL,
-    timeout: 10000,
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': config.clickup.token
+      'Authorization': config.clickup.token,
+      'Content-Type': 'application/json'
     }
   });
-};
-
-const makeRequest = async <T>(request: () => Promise<T>): Promise<T> => {
-  const maxRetries = 3;
-  const retryDelay = 1000;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await request();
-    } catch (error: any) {
-      if (attempt === maxRetries || (error.response?.status !== 429 && error.response?.status !== 504)) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
-    }
-  }
-
-  throw new Error('Max retries exceeded');
 };
 
 // Priority mapping based on ClickUp's API
@@ -46,31 +23,78 @@ export const PRIORITY_MAP: { [key: number]: Priority } = {
   4: { id: "4", priority: "low", color: "#d8d8d8", orderindex: "4" }
 };
 
+interface List {
+  id: string;
+  name: string;
+  orderindex: number;
+  content: string;
+  status: {
+    status: string;
+    color: string;
+    hide_label: boolean;
+  };
+  priority: {
+    priority: string;
+    color: string;
+  };
+  task_count: number;
+  due_date: string;
+  start_date: string;
+  folder: {
+    id: string;
+    name: string;
+    hidden: boolean;
+    access: boolean;
+  };
+  space: {
+    id: string;
+    name: string;
+    access: boolean;
+  };
+  archived: boolean;
+  override_statuses: boolean;
+  permission_level: string;
+}
+
+interface TasksResponse {
+  tasks: Task[];
+}
+
+interface CreateTaskData {
+  name: string;
+  description: string;
+  priority: number;
+  status: string;
+  due_date?: number;
+}
+
+interface CreateTagData {
+  name: string;
+  tag_bg: string;
+  tag_fg: string;
+}
+
 export async function createTask(
   listId: string,
   name: string,
-  description?: string,
-  priority?: number,
-  status?: string
+  description: string,
+  priority: number,
+  status: string,
+  dueDate?: string
 ): Promise<Task> {
-  const config = await getConfig();
-  const { token } = config.clickup;
+  const axiosInstance = await getAxiosInstance();
+  const taskData: CreateTaskData = {
+    name,
+    description,
+    priority,
+    status,
+  };
 
-  if (!listId) {
-    throw new Error('No list ID specified. Please set a default list or provide a list ID.');
+  if (dueDate) {
+    taskData.due_date = new Date(dueDate).getTime();
   }
 
-  const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.post<Task>(
-    `/list/${listId}/task`,
-    {
-      name,
-      description,
-      priority: priority || undefined,
-      status
-    }
-  );
-
+  const response = await axiosInstance.post<Task>(`/list/${listId}/task`, taskData);
   return response.data;
 }
 
@@ -93,29 +117,24 @@ export async function createSubtask(
     name,
     description,
     parent: parentId,  
-    priority: priority,
+    priority: priority ? PRIORITY_MAP[priority] : undefined,
     status: status
   };
 
-  const response = await axiosInstance.post<Task>(
+  const response = await axiosInstance.post<{ data: Task }>(
     `/list/${parentTask.list.id}/task`,
     payload
   );
 
-  return response.data;
+  return response.data.data;
 }
 
 export async function listTasks(listId?: string): Promise<Task[]> {
   const config = await getConfig();
-  const { token, defaultList } = config.clickup;
-  const targetListId = listId || defaultList;
+  const targetListId = listId || config.clickup.defaultList;
 
   if (!targetListId) {
     throw new Error('No list ID specified. Please set a default list or provide a list ID.');
-  }
-
-  interface TasksResponse {
-    tasks: Task[];
   }
 
   const axiosInstance = await getAxiosInstance();
@@ -171,38 +190,48 @@ export async function listTasks(listId?: string): Promise<Task[]> {
 export async function getTask(taskId: string): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
   
-  // Get task details including subtasks
-  const query = new URLSearchParams({
-    include_subtasks: 'true',
-    custom_fields: 'true'
-  }).toString();
+  try {
+    // Get task details including subtasks
+    const query = new URLSearchParams({
+      include_subtasks: 'true',
+      custom_fields: 'true'
+    }).toString();
 
-  const response = await axiosInstance.get<Task>(
-    `/task/${taskId}?${query}`
-  );
+    const response = await axiosInstance.get<Task>(
+      `/task/${taskId}?${query}`
+    );
 
-  return response.data;
+    // Check if we got a valid response
+    if (!response.data || typeof response.data !== 'object') {
+      throw new Error('Invalid response from ClickUp API');
+    }
+
+    return response.data;
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status: number } };
+      if (axiosError.response?.status === 404) {
+        throw new Error(`Task with ID ${taskId} not found`);
+      } else if (axiosError.response?.status === 401) {
+        throw new Error('Unauthorized. Please check your ClickUp API token');
+      }
+    }
+    // For all other errors, throw a generic error message
+    throw new Error(`Error fetching task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function updateTask(taskId: string, updates: UpdateTaskParams): Promise<Task> {
-  const config = await getConfig();
-  const { token } = config.clickup;
-
-  // Ensure updates are sent in the correct format
+  const axiosInstance = await getAxiosInstance();
+  
   const requestBody = {
     ...updates,
     priority: updates.priority
   };
 
-  const response = await axios.put<Task>(
-    `${BASE_URL}/task/${taskId}`,
-    requestBody,
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token
-      }
-    }
+  const response = await axiosInstance.put<Task>(
+    `/task/${taskId}`,
+    requestBody
   );
 
   return response.data;
@@ -214,61 +243,39 @@ export async function deleteTask(taskId: string): Promise<void> {
 }
 
 export async function getListStatuses(listId: string): Promise<TaskStatus[]> {
-  const config = await getConfig();
-  const { token } = config.clickup;
-
-  interface ListResponse {
-    statuses: TaskStatus[];
-  }
-
-  const response = await axios.get<ListResponse>(
-    `${BASE_URL}/list/${listId}`,
-    {
-      headers: {
-        'Authorization': token
-      }
-    }
-  );
-
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ statuses: TaskStatus[] }>(`/list/${listId}`);
   return response.data.statuses;
 }
 
-export async function getWorkspaces(): Promise<any[]> {
-  const api = await getAxiosInstance();
-  return makeRequest(async () => {
-    const response = await api.get<{ teams: any[] }>('/team');
-    return response.data.teams;
-  });
+export async function getWorkspaces(): Promise<Workspace[]> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ data: { workspaces: Workspace[] } }>('/team');
+  return response.data.data.workspaces;
 }
 
-export async function getSpaces(workspaceId: string): Promise<any[]> {
-  const api = await getAxiosInstance();
-  return makeRequest(async () => {
-    const response = await api.get<{ spaces: any[] }>(`/team/${workspaceId}/space`);
-    return response.data.spaces;
-  });
+export async function getSpaces(workspaceId: string): Promise<Space[]> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ data: { spaces: Space[] } }>(`/team/${workspaceId}/space`);
+  return response.data.data.spaces;
 }
 
-export async function getLists(spaceId: string): Promise<any[]> {
-  const api = await getAxiosInstance();
-  return makeRequest(async () => {
-    const response = await api.get<{ lists: any[] }>(`/space/${spaceId}/list`);
-    return response.data.lists;
-  });
+export async function getLists(spaceId: string): Promise<List[]> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ data: { lists: List[] } }>(`/space/${spaceId}/list`);
+  return response.data.data.lists;
 }
 
 export async function listSubtasks(taskId: string): Promise<Task[]> {
-  const api = await getAxiosInstance();
-  return makeRequest(async () => {
-    const response = await api.get<{ tasks: Task[] }>(`/task/${taskId}/subtask`);
-    return response.data.tasks;
-  });
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ data: { tasks: Task[] } }>(`/task/${taskId}/subtask`);
+  return response.data.data.tasks;
 }
 
 export async function createStatus(listId: string, status: string, color: string, orderindex?: number): Promise<TaskStatus> {
   const axiosInstance = await getAxiosInstance();
   
-  const response = await axiosInstance.post<TaskStatus>(
+  const response = await axiosInstance.post<{ data: TaskStatus }>(
     `/list/${listId}/status`,
     {
       status,
@@ -277,13 +284,13 @@ export async function createStatus(listId: string, status: string, color: string
     }
   );
 
-  return response.data;
+  return response.data.data;
 }
 
 export async function updateStatus(listId: string, oldStatus: string, newStatus: string, color?: string, orderindex?: number): Promise<TaskStatus> {
   const axiosInstance = await getAxiosInstance();
   
-  const response = await axiosInstance.put<TaskStatus>(
+  const response = await axiosInstance.put<{ data: TaskStatus }>(
     `/list/${listId}/status/${oldStatus}`,
     {
       status: newStatus,
@@ -292,7 +299,7 @@ export async function updateStatus(listId: string, oldStatus: string, newStatus:
     }
   );
 
-  return response.data;
+  return response.data.data;
 }
 
 export async function deleteStatus(listId: string, status: string): Promise<void> {
@@ -308,12 +315,13 @@ export async function getSpaceTags(spaceId: string): Promise<Tag[]> {
 
 export async function createTag(spaceId: string, name: string, tagBg: string = '#000000', tagFg: string = '#ffffff'): Promise<Tag> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.post<Tag>(`/space/${spaceId}/tag`, {
+  const tagData: CreateTagData = {
     name,
     tag_bg: tagBg,
     tag_fg: tagFg
-  });
-  return response.data;
+  };
+  const response = await axiosInstance.post<{ tag: Tag }>(`/space/${spaceId}/tag`, { tag: tagData });
+  return response.data.tag;
 }
 
 export async function deleteTag(spaceId: string, name: string): Promise<void> {
@@ -323,8 +331,9 @@ export async function deleteTag(spaceId: string, name: string): Promise<void> {
 
 export async function updateTaskTags(taskId: string, tags: string[]): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.put<Task>(`/task/${taskId}`, {
-    tags
-  });
-  return response.data;
+  const response = await axiosInstance.put<{ data: Task }>(
+    `/task/${taskId}`,
+    { tags }
+  );
+  return response.data.data;
 }

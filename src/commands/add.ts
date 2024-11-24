@@ -145,7 +145,7 @@ export const add = new Command('add')
         const task = await createTask(
           listId,
           name,
-          description ? sanitizeText(description) : undefined,
+          description || '',  // Provide empty string if description is undefined
           Number(priority),
           status
         );

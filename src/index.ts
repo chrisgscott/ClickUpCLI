@@ -10,6 +10,8 @@ import get from './commands/get.js';
 import del from './commands/delete.js';
 import status from './commands/status.js';
 import tag from './commands/tag.js';
+import exportConfig from './commands/export-config.js';
+import apply from './commands/apply.js';
 
 program
   .name('task')
@@ -25,5 +27,7 @@ program.addCommand(get);
 program.addCommand(del);
 program.addCommand(status);
 program.addCommand(tag);
+program.addCommand(exportConfig);
+program.addCommand(apply);
 
 program.parse(process.argv);
