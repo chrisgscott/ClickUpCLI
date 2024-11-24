@@ -250,20 +250,20 @@ export async function getListStatuses(listId: string): Promise<TaskStatus[]> {
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.get<{ data: { workspaces: Workspace[] } }>('/team');
-  return response.data.data.workspaces;
+  const response = await axiosInstance.get<{ teams: Workspace[] }>('/team');
+  return response.data.teams;
 }
 
 export async function getSpaces(workspaceId: string): Promise<Space[]> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.get<{ data: { spaces: Space[] } }>(`/team/${workspaceId}/space`);
-  return response.data.data.spaces;
+  const response = await axiosInstance.get<{ spaces: Space[] }>(`/team/${workspaceId}/space`);
+  return response.data.spaces;
 }
 
 export async function getLists(spaceId: string): Promise<List[]> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.get<{ data: { lists: List[] } }>(`/space/${spaceId}/list`);
-  return response.data.data.lists;
+  const response = await axiosInstance.get<{ lists: List[] }>(`/space/${spaceId}/list`);
+  return response.data.lists;
 }
 
 export async function listSubtasks(taskId: string): Promise<Task[]> {
