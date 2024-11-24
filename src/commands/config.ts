@@ -11,8 +11,10 @@ const CONFIG_DIR = join(homedir(), '.task-cli');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 export const config = new Command('config')
-  .description('Configure the CLI')
-  .option('-i, --interactive', 'Interactive configuration mode')
+  .description('Configure CLI settings including ClickUp API token and default list')
+  .option('-t, --token <token>', 'Set ClickUp API token')
+  .option('-l, --list <listId>', 'Set default list ID')
+  .option('-i, --interactive', 'Configure settings interactively')
   .action(async (options) => {
     try {
       // Check if config exists
@@ -36,7 +38,7 @@ export const config = new Command('config')
             name: 'token',
             message: 'Enter your ClickUp API token:',
             default: config.clickup.token,
-            validate: (input: string) => {
+            validate: (input: string): boolean | string => {
               if (!input.trim()) {
                 return 'API token is required';
               }

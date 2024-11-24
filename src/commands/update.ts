@@ -5,12 +5,12 @@ import { getTask, updateTask } from '../services/clickup.js';
 import { UpdateTaskParams } from '../types/clickup.js';
 
 export const update = new Command('update')
-  .description('Update a task')
+  .description('Update an existing task\'s name, description, status, or priority')
   .argument('<taskId>', 'ID of the task to update')
-  .option('-n, --name <name>', 'New name for the task')
-  .option('-d, --description <description>', 'New description for the task')
-  .option('-p, --priority <priority>', 'New priority for the task (1-4)')
-  .option('-s, --status <status>', 'New status for the task')
+  .option('-n, --name <name>', 'New task name')
+  .option('-d, --description <description>', 'New task description')
+  .option('-s, --status <status>', 'New task status (e.g., "in progress", "complete")')
+  .option('-p, --priority <priority>', 'New task priority (e.g., "urgent", "high", "normal")')
   .action(async (taskId: string, options) => {
     try {
       // Get current task details

@@ -4,22 +4,23 @@ import chalk from 'chalk';
 import { createTask, createSubtask, getListStatuses } from '../services/clickup.js';
 import { getConfig } from '../config/store.js';
 import { TaskStatus } from '../types/clickup.js';
+import { sanitizeText } from '../utils/text.js';
 
 export const add = new Command('add')
-  .description('Add a new task')
-  .argument('[name]', 'Task name')
+  .description('Add a new task or subtask')
+  .argument('[name]', 'Name of the task')
   .option('-d, --description <description>', 'Task description')
-  .option('-p, --priority <priority>', 'Task priority (1-4)')
-  .option('-s, --status <status>', 'Task status')
-  .option('--parent-id <parentId>', 'Parent task ID (for creating subtasks)')
+  .option('-s, --status <status>', 'Task status (e.g., "in progress", "backlog")')
+  .option('-p, --priority <priority>', 'Task priority (e.g., "urgent", "high", "normal")')
+  .option('-t, --parent <taskId>', 'Parent task ID (creates a subtask)')
   .action(async (taskName, options) => {
     try {
       const config = await getConfig();
-      let { description, priority, status, parentId } = options;
+      let { description, priority, status, taskId } = options;
       let name = taskName;
 
       // Ensure we have a list ID when creating a task
-      if (!config.clickup?.defaultList && !parentId) {
+      if (!config.clickup?.defaultList && !taskId) {
         console.error(chalk.red('Default list not set. Please run "task config --interactive" first.'));
         process.exit(1);
       }
@@ -28,7 +29,7 @@ export const add = new Command('add')
 
       // Get available statuses for the list if we're creating a task (not a subtask)
       let availableStatuses: TaskStatus[] = [];
-      if (!parentId && listId) {
+      if (!taskId && listId) {
         try {
           availableStatuses = await getListStatuses(listId);
         } catch (error) {
@@ -92,8 +93,14 @@ export const add = new Command('add')
         process.exit(1);
       }
 
-      if (parentId) {
-        const task = await createSubtask(parentId, name, description, Number(priority), status);
+      if (taskId) {
+        const task = await createSubtask(
+          taskId,
+          name,
+          description ? sanitizeText(description) : undefined,
+          Number(priority),
+          status
+        );
         console.log(chalk.green('\n✓ Subtask created successfully!'));
         console.log('\nCreated subtask details:');
         console.log(`ID: ${chalk.blue(task.id)}`);
@@ -102,7 +109,13 @@ export const add = new Command('add')
         console.log(`Status: ${task.status.status}`);
         console.log(`Priority: ${task.priority?.priority || 'none'}`);
       } else if (listId) {
-        const task = await createTask(listId, name, description, Number(priority), status);
+        const task = await createTask(
+          listId,
+          name,
+          description ? sanitizeText(description) : undefined,
+          Number(priority),
+          status
+        );
         console.log(chalk.green('\n✓ Task created successfully!'));
         console.log('\nCreated task details:');
         console.log(`ID: ${chalk.blue(task.id)}`);

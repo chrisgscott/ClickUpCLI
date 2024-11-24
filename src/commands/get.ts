@@ -28,7 +28,7 @@ function displayTask(task: Task, isSubtask: boolean = false) {
 }
 
 export const get = new Command('get')
-  .description('Get detailed information about a task, including its description, status, priority, and any subtasks')
+  .description('Get detailed information about a task, including its full description, status, priority, and metadata')
   .argument('<taskId>', 'The ID of the task to retrieve')
   .action(async (taskId: string) => {
     try {

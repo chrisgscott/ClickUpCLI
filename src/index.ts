@@ -12,7 +12,7 @@ import del from './commands/delete.js';
 program
   .name('task')
   .description('CLI tool for managing tasks in ClickUp')
-  .version('1.0.0');
+  .version('1.0.7');
 
 program.addCommand(add);
 program.addCommand(list);

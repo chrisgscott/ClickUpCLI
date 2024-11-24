@@ -5,8 +5,8 @@ import { listTasks } from '../services/clickup.js';
 import { getConfig } from '../config/store.js';
 
 export const exportCmd = new Command('export')
-  .description('Export tasks to a markdown file')
-  .option('-o, --output <file>', 'Output file', 'tasks.md')
+  .description('Export tasks to a markdown file with full details')
+  .option('-o, --output <file>', 'Output file path (default: tasks.md)')
   .action(async (options) => {
     try {
       const config = await getConfig();

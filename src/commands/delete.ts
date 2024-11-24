@@ -3,8 +3,8 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import { deleteTask, getTask } from '../services/clickup.js';
 
-export const del = new Command('delete')
-  .description('Delete a task')
+export const delete_command = new Command('delete')
+  .description('Delete a task and optionally its subtasks')
   .argument('<taskId>', 'ID of the task to delete')
   .option('-f, --force', 'Skip confirmation prompt')
   .action(async (taskId, options) => {
@@ -40,4 +40,4 @@ export const del = new Command('delete')
     }
   });
 
-export default del;
+export default delete_command;

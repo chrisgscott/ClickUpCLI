@@ -5,12 +5,9 @@ A command-line interface tool for managing ClickUp tasks directly from your term
 ## Features
 
 - 🚀 Create and manage tasks from the command line
-- 📋 Create and manage subtasks with proper task hierarchy
-- 🔄 Interactive task creation and updates
-- 📝 Task templates for common workflows
-- 🎯 Priority and status management
-- 🔍 List and filter tasks with hierarchical display
-- 📊 Detailed task view with subtask information
+- 📋 View task hierarchies with subtasks
+- 🔍 List and filter tasks by status or priority
+- 📊 Detailed task view with full description and metadata
 - ⚡️ Fast and user-friendly interface
 
 ## Installation
@@ -30,20 +27,26 @@ npm install -g @chrisgscott/task-cli
 
 ## Usage
 
-### Task Management
+### Basic Commands
 
 ```bash
-# List all tasks (now with hierarchical subtask display)
+# List all tasks (hierarchical display with subtasks)
 task list
+
+# Filter tasks by status
+task list --status "in progress"
+
+# Filter tasks by priority
+task list --priority "high"
 
 # Get detailed information about a specific task
 task get TASK_ID
 
 # Create a new task
-task add "New feature implementation"
+task add "New task name"
 
 # Create a task with details
-task add "Update API" -d "Update endpoint documentation" -p 2 -s "in progress"
+task add "Update API" -d "Update endpoint documentation" -p high -s "in progress"
 
 # Create a subtask
 task add "Implement auth" -t PARENT_TASK_ID
@@ -51,87 +54,21 @@ task add "Implement auth" -t PARENT_TASK_ID
 # Update a task
 task update TASK_ID
 
-# List tasks with subtasks
-task list --include-subtasks
+# Delete a task
+task delete TASK_ID
 
-# List subtasks
-task list -t TASK_ID
+# Export tasks to markdown
+task export
 ```
 
-### Interactive Mode
+### Configuration
 
-Most commands support interactive mode for a more guided experience:
+Your configuration is stored in `~/.task-cli/config.json`. You can update your configuration using:
 
 ```bash
-# Interactive task creation
-task add
-
-# Interactive task update
-task update
-
-# Interactive template selection
-task add --template
+# Configure CLI settings
+task config
 ```
-
-### Using Templates
-
-```bash
-# List available templates
-task template:list
-
-# Create a new task from template
-task add --template feature-dev
-
-# Create template from existing task
-task template:create --from TASK_ID
-
-# Export template
-task template:export TEMPLATE_NAME > template.json
-
-# Import template
-task template:import template.json
-```
-
-## Configuration
-
-Your configuration is stored in `~/.task-cli/config.json`. You can edit this file directly or reconfigure using:
-
-```bash
-# Reconfigure interactively
-task config --interactive
-
-# Update specific settings
-task config --token NEW_TOKEN
-task config --workspace WORKSPACE_ID
-task config --space SPACE_ID
-task config --list LIST_ID
-```
-
-## Examples
-
-### Creating a Feature Development Task
-
-```bash
-# Create parent task
-task add "User Authentication Feature" -d "Implement user authentication system" -p 2
-
-# Add subtasks
-task add "API Design" -t PARENT_ID -d "Design authentication endpoints"
-task add "Database Schema" -t PARENT_ID -d "Design user and session tables"
-task add "Implementation" -t PARENT_ID -d "Implement authentication logic"
-task add "Testing" -t PARENT_ID -d "Write unit and integration tests"
-```
-
-### Using Templates
-
-```bash
-# Create a new feature using the feature-dev template
-task add --template feature-dev --var feature="Payment Integration" --var sprint=24
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
