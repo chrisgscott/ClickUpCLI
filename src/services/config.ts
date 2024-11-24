@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
-import { createTask, getListStatuses, getSpaceTags, createTag, createStatus, updateStatus } from './clickup.js';
+import { createTask, getListStatuses, getSpaceTags, createTag, manageStatus } from './clickup.js';
 import { getConfig } from '../config/store.js';
 import { BulkConfig, ValidationError, TaskConfig, TagConfig } from '../types/config.js';
 
@@ -199,35 +199,19 @@ async function applyStatusChanges(listId: string, statuses: { name: string; colo
   }
 
   console.log(chalk.blue('\nApplying status changes...'));
-  const currentStatuses = await getListStatuses(listId);
-  const currentStatusMap = new Map(currentStatuses.map(s => [s.status.toLowerCase(), s]));
 
   for (const status of statuses) {
-    const currentStatus = currentStatusMap.get(status.name.toLowerCase());
     try {
-      if (currentStatus) {
-        // Update existing status
-        await updateStatus(
-          listId,
-          currentStatus.status,
-          status.name,
-          status.color,
-          status.order
-        );
-        console.log(chalk.green(`  ✓ Updated status: ${status.name}`));
-      } else {
-        // Create new status
-        await createStatus(
-          listId,
-          status.name,
-          status.color,
-          status.order
-        );
-        console.log(chalk.green(`  ✓ Created status: ${status.name}`));
-      }
+      await manageStatus(
+        listId,
+        status.name,
+        status.color,
+        status.order
+      );
+      console.log(chalk.green(`  ✓ Managed status: ${status.name}`));
     } catch (error) {
       if (error instanceof Error) {
-        console.error(chalk.red(`  ✗ Failed to manage status ${status.name}: ${error.message}`));
+        console.error(chalk.red(`  ✗ ${error.message}`));
       } else {
         console.error(chalk.red(`  ✗ Failed to manage status ${status.name}`));
       }

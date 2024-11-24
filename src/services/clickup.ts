@@ -206,10 +206,16 @@ export async function getTask(taskId: string): Promise<Task> {
       throw new Error('Invalid response from ClickUp API');
     }
 
+    // Check if task has subtasks and fetch them
+    if (response.data.subtasks) {
+      const subtasks = await listSubtasks(taskId);
+      response.data.subtasks = subtasks;
+    }
+
     return response.data;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { status: number } };
+      const axiosError = error as { response?: { status?: number, data?: { message?: string } } };
       if (axiosError.response?.status === 404) {
         throw new Error(`Task with ID ${taskId} not found`);
       } else if (axiosError.response?.status === 401) {
@@ -217,7 +223,7 @@ export async function getTask(taskId: string): Promise<Task> {
       }
     }
     // For all other errors, throw a generic error message
-    throw new Error(`Error fetching task: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw error;
   }
 }
 
@@ -340,4 +346,57 @@ export async function updateTaskTags(taskId: string, tags: string[]): Promise<Ta
     { tags }
   );
   return response.data.data;
+}
+
+export async function manageStatus(
+  listId: string,
+  status: string,
+  color: string,
+  orderindex: number
+): Promise<TaskStatus> {
+  const axiosInstance = await getAxiosInstance();
+  
+  try {
+    // First try to get existing statuses
+    const existingStatuses = await getListStatuses(listId);
+    const existingStatus = existingStatuses.find(s => s.status.toLowerCase() === status.toLowerCase());
+    
+    if (existingStatus) {
+      // If status exists, update it
+      const encodedStatus = encodeURIComponent(existingStatus.status);
+      const response = await axiosInstance.put<{ data: TaskStatus }>(
+        `/list/${listId}/status/${encodedStatus}`,
+        {
+          status,
+          color,
+          orderindex: orderindex.toString()
+        }
+      );
+      return response.data.data;
+    } else {
+      // If status doesn't exist, create it
+      const response = await axiosInstance.post<TaskStatus>(
+        `/list/${listId}/status`,
+        {
+          status,
+          color,
+          orderindex: orderindex.toString()
+        }
+      );
+      return response.data;
+    }
+  } catch (error: unknown) {
+    let message = 'Unknown error';
+    if (error instanceof Error) {
+      message = error.message;
+    }
+    // Type guard for axios error response
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: { status?: number, data?: { message?: string } } };
+      if (axiosError.response?.data?.message) {
+        message = axiosError.response.data.message;
+      }
+    }
+    throw new Error(`Failed to manage status ${status}: ${message}`);
+  }
 }
