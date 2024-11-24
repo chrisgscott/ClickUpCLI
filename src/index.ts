@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { program } from 'commander';
+import { createRequire } from 'module';
 import add from './commands/add.js';
 import list from './commands/list.js';
 import config from './commands/config.js';
@@ -13,10 +14,13 @@ import tag from './commands/tag.js';
 import exportConfig from './commands/export-config.js';
 import apply from './commands/apply.js';
 
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
+
 program
   .name('task')
   .description('CLI tool for managing tasks in ClickUp')
-  .version('1.3.0');
+  .version(version);
 
 program.addCommand(add);
 program.addCommand(list);

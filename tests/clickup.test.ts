@@ -1,5 +1,5 @@
 import { Config, Task } from '../src/types/clickup.js';
-import { createTask, createSubtask, listTasks } from '../src/services/clickup.js';
+import { createTask, createSubtask, listTasks, PRIORITY_MAP } from '../src/services/clickup.js';
 import { getConfig } from '../src/config/store.js';
 import axios from 'axios';
 
@@ -134,7 +134,7 @@ describe('ClickUp Service', () => {
 
       mockedAxios.create.mockReturnValue(mockAxiosInstance as unknown as typeof axios);
       mockAxiosInstance.get.mockResolvedValueOnce(createMockResponse(mockParentTask));
-      mockAxiosInstance.post.mockResolvedValueOnce(createMockResponse(mockTasks[0]));
+      mockAxiosInstance.post.mockResolvedValueOnce(createMockResponse({ data: mockTasks[0] }));
 
       const result = await createSubtask('1', 'Test Subtask', 'Test Description', 3);
       expect(result).toEqual(mockTasks[0]);
@@ -142,8 +142,9 @@ describe('ClickUp Service', () => {
       expect(mockAxiosInstance.post).toHaveBeenCalledWith('/list/123/task', {
         name: 'Test Subtask',
         description: 'Test Description',
-        priority: 3,
-        parent: '1'
+        priority: PRIORITY_MAP[3],
+        parent: '1',
+        status: undefined
       });
     });
   });
