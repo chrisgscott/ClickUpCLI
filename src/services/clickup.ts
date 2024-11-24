@@ -275,23 +275,26 @@ export async function listSubtasks(taskId: string): Promise<Task[]> {
 export async function createStatus(listId: string, status: string, color: string, orderindex?: number): Promise<TaskStatus> {
   const axiosInstance = await getAxiosInstance();
   
-  const response = await axiosInstance.post<{ data: TaskStatus }>(
+  const payload = {
+    status,
+    color,
+    orderindex: orderindex !== undefined ? orderindex.toString() : undefined
+  };
+
+  const response = await axiosInstance.post<TaskStatus>(
     `/list/${listId}/status`,
-    {
-      status,
-      color,
-      orderindex
-    }
+    payload
   );
 
-  return response.data.data;
+  return response.data;
 }
 
 export async function updateStatus(listId: string, oldStatus: string, newStatus: string, color?: string, orderindex?: number): Promise<TaskStatus> {
   const axiosInstance = await getAxiosInstance();
   
+  const encodedOldStatus = encodeURIComponent(oldStatus);
   const response = await axiosInstance.put<{ data: TaskStatus }>(
-    `/list/${listId}/status/${oldStatus}`,
+    `/list/${listId}/status/${encodedOldStatus}`,
     {
       status: newStatus,
       color,
@@ -304,7 +307,8 @@ export async function updateStatus(listId: string, oldStatus: string, newStatus:
 
 export async function deleteStatus(listId: string, status: string): Promise<void> {
   const axiosInstance = await getAxiosInstance();
-  await axiosInstance.delete(`/list/${listId}/status/${status}`);
+  const encodedStatus = encodeURIComponent(status);
+  await axiosInstance.delete(`/list/${listId}/status/${encodedStatus}`);
 }
 
 export async function getSpaceTags(spaceId: string): Promise<Tag[]> {

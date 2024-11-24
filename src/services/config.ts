@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
-import { createTask, getListStatuses, getSpaceTags, createTag, deleteTag, createStatus } from './clickup.js';
+import { createTask, getListStatuses, getSpaceTags, createTag, createStatus, updateStatus } from './clickup.js';
 import { getConfig } from '../config/store.js';
 import { BulkConfig, ValidationError, TaskConfig, TagConfig } from '../types/config.js';
 
@@ -189,17 +189,64 @@ async function applyTagChanges(spaceId: string, tags: TagConfig[]): Promise<void
   }
 }
 
+async function applyStatusChanges(listId: string, statuses: { name: string; color: string; order: number }[], dryRun: boolean = false): Promise<void> {
+  if (dryRun) {
+    console.log(chalk.blue('\nStatus changes to be applied:'));
+    for (const status of statuses) {
+      console.log(`  - ${status.name} (${status.color}, order: ${status.order})`);
+    }
+    return;
+  }
+
+  console.log(chalk.blue('\nApplying status changes...'));
+  const currentStatuses = await getListStatuses(listId);
+  const currentStatusMap = new Map(currentStatuses.map(s => [s.status.toLowerCase(), s]));
+
+  for (const status of statuses) {
+    const currentStatus = currentStatusMap.get(status.name.toLowerCase());
+    try {
+      if (currentStatus) {
+        // Update existing status
+        await updateStatus(
+          listId,
+          currentStatus.status,
+          status.name,
+          status.color,
+          status.order
+        );
+        console.log(chalk.green(`  ✓ Updated status: ${status.name}`));
+      } else {
+        // Create new status
+        await createStatus(
+          listId,
+          status.name,
+          status.color,
+          status.order
+        );
+        console.log(chalk.green(`  ✓ Created status: ${status.name}`));
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red(`  ✗ Failed to manage status ${status.name}: ${error.message}`));
+      } else {
+        console.error(chalk.red(`  ✗ Failed to manage status ${status.name}`));
+      }
+    }
+  }
+}
+
 export async function applyConfig(config: BulkConfig, dryRun: boolean = false): Promise<void> {
+  // Validate configuration
   const errors = validateConfig(config);
   if (errors.length > 0) {
-    console.error(chalk.red('Configuration validation failed:'));
-    errors.forEach(error => {
-      console.error(chalk.red(`- ${error.type} "${error.item}": ${error.message}`));
-    });
+    console.error(chalk.red('\nConfiguration validation failed:'));
+    for (const error of errors) {
+      console.error(`  - ${error.message}`);
+    }
     throw new Error('Invalid configuration');
   }
 
-  // Create backup before applying changes
+  // Create backup
   if (!dryRun) {
     await createBackup();
   }
@@ -212,47 +259,15 @@ export async function applyConfig(config: BulkConfig, dryRun: boolean = false): 
     throw new Error('Default space and list must be configured');
   }
 
-  // Process tags if present in the config
+  // Apply changes
   if (config.tags) {
-    // Get existing tags first
-    const existingTags = await getSpaceTags(spaceId);
-    const existingTagNames = new Set(existingTags.map(t => t.name));
-
-    for (const tag of config.tags) {
-      if (dryRun) {
-        console.log(chalk.blue(`Would ${existingTagNames.has(tag.name) ? 'update' : 'create'} tag: ${tag.name}`));
-        continue;
-      }
-
-      try {
-        if (existingTagNames.has(tag.name)) {
-          // Delete and recreate the tag since ClickUp doesn't have a direct update endpoint
-          await deleteTag(spaceId, tag.name);
-        }
-        await applyTagChanges(spaceId, [tag]);
-      } catch (error) {
-        console.error(chalk.red(`Failed to ${existingTagNames.has(tag.name) ? 'update' : 'create'} tag "${tag.name}":`, error));
-      }
-    }
+    await applyTagChanges(spaceId, config.tags);
   }
 
-  // Process statuses if present in the config
   if (config.statuses) {
-    for (const status of config.statuses) {
-      if (dryRun) {
-        console.log(chalk.blue(`Would create status: ${status.name}`));
-        continue;
-      }
-      try {
-        await createStatus(listId, status.name, status.color, status.order);
-        console.log(chalk.green(`Created status: ${status.name}`));
-      } catch (error) {
-        console.error(chalk.red(`Failed to create status "${status.name}":`, error));
-      }
-    }
+    await applyStatusChanges(listId, config.statuses, dryRun);
   }
 
-  // Process tasks if present in the config
   if (config.tasks) {
     await applyTaskChanges(config.tasks, dryRun);
   }
