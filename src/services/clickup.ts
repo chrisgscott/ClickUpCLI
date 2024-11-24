@@ -264,3 +264,38 @@ export async function listSubtasks(taskId: string): Promise<Task[]> {
     return response.data.tasks;
   });
 }
+
+export async function createStatus(listId: string, status: string, color: string, orderindex?: number): Promise<TaskStatus> {
+  const axiosInstance = await getAxiosInstance();
+  
+  const response = await axiosInstance.post<TaskStatus>(
+    `/list/${listId}/status`,
+    {
+      status,
+      color,
+      orderindex
+    }
+  );
+
+  return response.data;
+}
+
+export async function updateStatus(listId: string, oldStatus: string, newStatus: string, color?: string, orderindex?: number): Promise<TaskStatus> {
+  const axiosInstance = await getAxiosInstance();
+  
+  const response = await axiosInstance.put<TaskStatus>(
+    `/list/${listId}/status/${oldStatus}`,
+    {
+      status: newStatus,
+      color,
+      orderindex
+    }
+  );
+
+  return response.data;
+}
+
+export async function deleteStatus(listId: string, status: string): Promise<void> {
+  const axiosInstance = await getAxiosInstance();
+  await axiosInstance.delete(`/list/${listId}/status/${status}`);
+}
