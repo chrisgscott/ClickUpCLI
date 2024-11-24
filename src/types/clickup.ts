@@ -21,6 +21,19 @@ export interface Priority {
   orderindex: string;
 }
 
+export interface Tag {
+  name: string;
+  tag_fg: string;
+  tag_bg: string;
+  creator?: {
+    id: number;
+    username: string;
+    color: string;
+    email: string;
+    profilePicture: string;
+  };
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -28,6 +41,7 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   url: string;
+  tags: Tag[];
   parent?: {
     id: string;
   };
@@ -48,6 +62,7 @@ export interface UpdateTaskParams {
   description?: string;
   priority?: number;
   status?: string;
+  tags?: string[];
 }
 
 export interface Workspace {

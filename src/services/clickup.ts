@@ -2,7 +2,7 @@ import axios from 'axios';
 import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Config, Priority, Task, TaskStatus, UpdateTaskParams } from '../types/clickup.js';
+import { Config, Priority, Task, TaskStatus, UpdateTaskParams, Tag } from '../types/clickup.js';
 import { getConfig } from '../config/store.js';
 
 const CONFIG_FILE = join(homedir(), '.task-cli', 'config.json');
@@ -298,4 +298,33 @@ export async function updateStatus(listId: string, oldStatus: string, newStatus:
 export async function deleteStatus(listId: string, status: string): Promise<void> {
   const axiosInstance = await getAxiosInstance();
   await axiosInstance.delete(`/list/${listId}/status/${status}`);
+}
+
+export async function getSpaceTags(spaceId: string): Promise<Tag[]> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.get<{ tags: Tag[] }>(`/space/${spaceId}/tag`);
+  return response.data.tags;
+}
+
+export async function createTag(spaceId: string, name: string, tagBg: string = '#000000', tagFg: string = '#ffffff'): Promise<Tag> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.post<Tag>(`/space/${spaceId}/tag`, {
+    name,
+    tag_bg: tagBg,
+    tag_fg: tagFg
+  });
+  return response.data;
+}
+
+export async function deleteTag(spaceId: string, name: string): Promise<void> {
+  const axiosInstance = await getAxiosInstance();
+  await axiosInstance.delete(`/space/${spaceId}/tag/${name}`);
+}
+
+export async function updateTaskTags(taskId: string, tags: string[]): Promise<Task> {
+  const axiosInstance = await getAxiosInstance();
+  const response = await axiosInstance.put<Task>(`/task/${taskId}`, {
+    tags
+  });
+  return response.data;
 }

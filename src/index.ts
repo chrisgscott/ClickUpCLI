@@ -9,6 +9,7 @@ import exportCmd from './commands/export.js';
 import get from './commands/get.js';
 import del from './commands/delete.js';
 import status from './commands/status.js';
+import tag from './commands/tag.js';
 
 program
   .name('task')
@@ -23,5 +24,6 @@ program.addCommand(exportCmd);
 program.addCommand(get);
 program.addCommand(del);
 program.addCommand(status);
+program.addCommand(tag);
 
 program.parse(process.argv);

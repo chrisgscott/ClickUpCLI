@@ -1,9 +1,9 @@
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
-import { createTask, createSubtask, getListStatuses } from '../services/clickup.js';
+import { createTask, createSubtask, getListStatuses, getSpaceTags, updateTaskTags } from '../services/clickup.js';
 import { getConfig } from '../config/store.js';
-import { TaskStatus } from '../types/clickup.js';
+import { TaskStatus, Tag } from '../types/clickup.js';
 import { sanitizeText } from '../utils/text.js';
 
 export const add = new Command('add')
@@ -13,10 +13,12 @@ export const add = new Command('add')
   .option('-s, --status <status>', 'Task status (e.g., "in progress", "backlog")')
   .option('-p, --priority <priority>', 'Task priority (e.g., "urgent", "high", "normal")')
   .option('-t, --parent <taskId>', 'Parent task ID (creates a subtask)')
+  .option('--tags <tags>', 'Comma-separated list of tags to add to the task')
   .action(async (taskName, options) => {
     try {
       const config = await getConfig();
-      let { description, priority, status, taskId } = options;
+      let { description, priority, status } = options;
+      const { taskId } = options;
       let name = taskName;
 
       // Ensure we have a list ID when creating a task
@@ -34,6 +36,16 @@ export const add = new Command('add')
           availableStatuses = await getListStatuses(listId);
         } catch (error) {
           console.error(chalk.red('Error fetching list statuses. Will proceed without status validation.'));
+        }
+      }
+
+      // Get current tags if we're in interactive mode
+      let availableTags: Tag[] = [];
+      if (!taskId && listId) {
+        try {
+          availableTags = await getSpaceTags(config.clickup.defaultSpace || '');
+        } catch (error) {
+          console.error(chalk.yellow('Warning: Could not fetch tags. Will proceed without tag selection.'));
         }
       }
 
@@ -72,6 +84,16 @@ export const add = new Command('add')
               value: s.status
             })),
             when: !status && availableStatuses.length > 0
+          },
+          {
+            type: 'checkbox',
+            name: 'tags',
+            message: 'Select tags (optional):',
+            choices: availableTags.map(t => ({
+              name: chalk.hex(t.tag_bg).bgHex(t.tag_fg)(` ${t.name} `),
+              value: t.name
+            })),
+            when: availableTags.length > 0 && !options.tags
           }
         ]);
 
@@ -79,6 +101,7 @@ export const add = new Command('add')
         description = description || answers.description;
         priority = priority || answers.priority;
         status = status || answers.status;
+        options.tags = options.tags || (answers.tags ? answers.tags.join(',') : undefined);
       }
 
       if (!name || !description) {
@@ -93,6 +116,7 @@ export const add = new Command('add')
         process.exit(1);
       }
 
+      // Create the task
       if (taskId) {
         const task = await createSubtask(
           taskId,
@@ -101,6 +125,12 @@ export const add = new Command('add')
           Number(priority),
           status
         );
+
+        // Add tags if specified
+        if (options.tags) {
+          await updateTaskTags(task.id, options.tags.split(','));
+        }
+
         console.log(chalk.green('\n✓ Subtask created successfully!'));
         console.log('\nCreated subtask details:');
         console.log(`ID: ${chalk.blue(task.id)}`);
@@ -108,6 +138,9 @@ export const add = new Command('add')
         console.log(`Description: ${task.description}`);
         console.log(`Status: ${task.status.status}`);
         console.log(`Priority: ${task.priority?.priority || 'none'}`);
+        if (task.tags?.length > 0) {
+          console.log('Tags:', task.tags.map(t => chalk.hex(t.tag_bg).bgHex(t.tag_fg)(` ${t.name} `)).join(' '));
+        }
       } else if (listId) {
         const task = await createTask(
           listId,
@@ -116,6 +149,12 @@ export const add = new Command('add')
           Number(priority),
           status
         );
+
+        // Add tags if specified
+        if (options.tags) {
+          await updateTaskTags(task.id, options.tags.split(','));
+        }
+
         console.log(chalk.green('\n✓ Task created successfully!'));
         console.log('\nCreated task details:');
         console.log(`ID: ${chalk.blue(task.id)}`);
@@ -123,6 +162,9 @@ export const add = new Command('add')
         console.log(`Description: ${task.description}`);
         console.log(`Status: ${task.status.status}`);
         console.log(`Priority: ${task.priority?.priority || 'none'}`);
+        if (task.tags?.length > 0) {
+          console.log('Tags:', task.tags.map(t => chalk.hex(t.tag_bg).bgHex(t.tag_fg)(` ${t.name} `)).join(' '));
+        }
       }
     } catch (error: unknown) {
       if (error instanceof Error) {
