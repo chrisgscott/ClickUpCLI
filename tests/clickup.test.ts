@@ -1,6 +1,6 @@
+import { Config, Task } from '../src/types/clickup.js';
+import { createTask, createSubtask, listTasks } from '../src/services/clickup.js';
 import { getConfig } from '../src/config/store.js';
-import { createTask, createSubtask, listTasks, getTask } from '../src/services/clickup.js';
-import { Task } from '../src/types/clickup.js';
 import axios from 'axios';
 
 jest.mock('../src/config/store.js');
@@ -8,16 +8,24 @@ jest.mock('axios');
 
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-const createMockResponse = <T>(data: T) => ({
+interface MockResponse<T> {
+  data: T;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  config: Record<string, unknown>;
+}
+
+const createMockResponse = <T>(data: T): MockResponse<T> => ({
   data,
   status: 200,
   statusText: 'OK',
   headers: {},
-  config: {} as any
+  config: {}
 });
 
 describe('ClickUp Service', () => {
-  const mockConfig = {
+  const mockConfig: Config = {
     clickup: {
       token: 'test-token',
       defaultList: 'test-list-id'
@@ -29,22 +37,24 @@ describe('ClickUp Service', () => {
       id: '1',
       name: 'Task 1',
       description: 'Description 1',
-      status: { status: 'to do', type: 'open' },
+      status: { status: 'in progress', type: 'custom' },
       list: { id: '123' },
-      priority: { id: '3', priority: 'normal', color: '#000000', orderindex: '1' },
-      url: 'https://app.clickup.com/123',
-      space: { id: 'test-space-id', name: 'Test Space', private: false },
+      priority: { id: '1', priority: 'urgent', color: '#ff0000', orderindex: '1' },
+      url: 'https://app.clickup.com/123/v/li/1',
+      space: { id: '456', name: 'Test Space', private: false },
+      tags: [],
       subtasks: []
     },
     {
       id: '2',
       name: 'Task 2',
       description: 'Description 2',
-      status: { status: 'in progress', type: 'custom' },
+      status: { status: 'done', type: 'custom' },
       list: { id: '123' },
-      priority: { id: '3', priority: 'normal', color: '#000000', orderindex: '1' },
-      url: 'https://app.clickup.com/456',
-      space: { id: 'test-space-id', name: 'Test Space', private: false },
+      priority: { id: '2', priority: 'high', color: '#ffcc00', orderindex: '2' },
+      url: 'https://app.clickup.com/123/v/li/2',
+      space: { id: '456', name: 'Test Space', private: false },
+      tags: [],
       subtasks: []
     }
   ];
@@ -53,25 +63,26 @@ describe('ClickUp Service', () => {
     id: '1',
     name: 'Parent Task',
     description: 'Parent Description',
-    status: { status: 'to do', type: 'open' },
+    status: { status: 'in progress', type: 'custom' },
     list: { id: '123' },
-    priority: { id: '3', priority: 'normal', color: '#000000', orderindex: '1' },
-    url: 'https://app.clickup.com/789',
-    space: { id: 'test-space-id', name: 'Test Space', private: false },
+    priority: { id: '1', priority: 'urgent', color: '#ff0000', orderindex: '1' },
+    url: 'https://app.clickup.com/123/v/li/1',
+    space: { id: '456', name: 'Test Space', private: false },
+    tags: [],
     subtasks: []
   };
 
-  beforeEach(() => {
+  beforeEach((): void => {
     (getConfig as jest.Mock).mockResolvedValue(mockConfig);
     jest.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach((): void => {
     jest.clearAllMocks();
   });
 
   describe('createTask', () => {
-    it('should create a task successfully', async () => {
+    it('should create a task successfully', async (): Promise<void> => {
       const mockTask = {
         id: '123',
         name: 'Test Task',
@@ -85,15 +96,15 @@ describe('ClickUp Service', () => {
 
       const mockAxiosInstance = {
         get: jest.fn(),
-        post: jest.fn().mockResolvedValueOnce({ data: mockTask }),
+        post: jest.fn().mockResolvedValueOnce(createMockResponse(mockTask)),
         defaults: {
           headers: {
             common: { 'Accept': 'application/json' }
           }
         }
-      } as any;
+      };
 
-      mockedAxios.create.mockReturnValue(mockAxiosInstance);
+      mockedAxios.create.mockReturnValue(mockAxiosInstance as unknown as typeof axios);
 
       const result = await createTask('list123', 'Test Task', 'Test Description', 1, 'to do');
       expect(result).toEqual(mockTask);
@@ -110,7 +121,7 @@ describe('ClickUp Service', () => {
   });
 
   describe('createSubtask', () => {
-    it('should create a subtask with the given parameters', async () => {
+    it('should create a subtask with the given parameters', async (): Promise<void> => {
       const mockAxiosInstance = {
         get: jest.fn(),
         post: jest.fn(),
@@ -119,9 +130,9 @@ describe('ClickUp Service', () => {
             common: { 'Accept': 'application/json' }
           }
         }
-      } as any;
+      };
 
-      mockedAxios.create.mockReturnValue(mockAxiosInstance);
+      mockedAxios.create.mockReturnValue(mockAxiosInstance as unknown as typeof axios);
       mockAxiosInstance.get.mockResolvedValueOnce(createMockResponse(mockParentTask));
       mockAxiosInstance.post.mockResolvedValueOnce(createMockResponse(mockTasks[0]));
 
@@ -138,7 +149,7 @@ describe('ClickUp Service', () => {
   });
 
   describe('listTasks', () => {
-    it('should list all tasks in a list', async () => {
+    it('should list all tasks in a list', async (): Promise<void> => {
       const mockAxiosInstance = {
         get: jest.fn(),
         post: jest.fn(),
@@ -147,9 +158,9 @@ describe('ClickUp Service', () => {
             common: { 'Accept': 'application/json' }
           }
         }
-      } as any;
+      };
 
-      mockedAxios.create.mockReturnValue(mockAxiosInstance);
+      mockedAxios.create.mockReturnValue(mockAxiosInstance as unknown as typeof axios);
       mockAxiosInstance.get.mockResolvedValueOnce(createMockResponse({ tasks: mockTasks }));
 
       const result = await listTasks('test-list-id');

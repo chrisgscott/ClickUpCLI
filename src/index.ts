@@ -14,7 +14,7 @@ import tag from './commands/tag.js';
 program
   .name('task')
   .description('CLI tool for managing tasks in ClickUp')
-  .version('1.0.9');
+  .version('1.3.0');
 
 program.addCommand(add);
 program.addCommand(list);
