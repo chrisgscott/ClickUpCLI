@@ -8,33 +8,33 @@ tasks:
       - name: "Set up OAuth2 flow"
         description: "Implement OAuth2 authentication with JWT tokens"
         priority: 2
-        status: "backlog"
+        status: "to do"
         due_date: "2024-02-15"
       - name: "Create user roles"
         description: "Implement role-based access control"
         priority: 3
-        status: "backlog"
+        status: "to do"
 
   - name: "Improve Error Handling"
     description: "Enhance error handling and user feedback"
     priority: 2
-    status: "backlog"
+    status: "to do"
     subtasks:
       - name: "Add error logging"
         description: "Implement structured error logging"
         priority: 2
-        status: "backlog"
+        status: "to do"
       - name: "Create error messages"
         description: "Design user-friendly error messages"
         priority: 3
-        status: "backlog"
+        status: "to do"
       - name: "Add retry mechanism"
         description: "Implement automatic retry for failed operations"
         priority: 2
-        status: "backlog"
+        status: "to do"
 
   - name: "Simple Task"
     description: "A task without subtasks"
     priority: 4
-    status: "backlog"
+    status: "to do"
     due_date: "2024-03-15"

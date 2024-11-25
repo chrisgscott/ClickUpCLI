@@ -34,6 +34,7 @@ export interface TaskConfig {
   tags?: string[];
   due_date?: string;
   assignees?: string[];
+  subtasks?: TaskConfig[];
 }
 
 export interface ValidationError {
