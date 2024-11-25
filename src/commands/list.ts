@@ -38,3 +38,5 @@ export const list = new Command('list')
       process.exit(1);
     }
   });
+
+export default list;
