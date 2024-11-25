@@ -18,20 +18,24 @@ export const add = new Command('add')
     try {
       const config = await getConfig();
       let { description, priority, status } = options;
-      const { taskId } = options;
+      const { parent: parentId } = options;  // Get parent ID from options
       let name = taskName;
 
       // Ensure we have a list ID when creating a task
-      if (!config.clickup?.defaultList && !taskId) {
+      if (!config.clickup?.defaultList && !parentId) {  // Only check list if not creating subtask
         console.error(chalk.red('Default list not set. Please run "task config --interactive" first.'));
         process.exit(1);
       }
 
       const listId = config.clickup?.defaultList;
+      if (!listId && !parentId) {  // Only check list if not creating subtask
+        console.error(chalk.red('Default list not set. Please run "task config --interactive" first.'));
+        process.exit(1);
+      }
 
       // Get available statuses for the list if we're creating a task (not a subtask)
       let availableStatuses: TaskStatus[] = [];
-      if (!taskId && listId) {
+      if (!parentId && listId) {  // Only get statuses if not creating subtask
         try {
           availableStatuses = await getListStatuses(listId);
         } catch (error) {
@@ -41,7 +45,7 @@ export const add = new Command('add')
 
       // Get current tags if we're in interactive mode
       let availableTags: Tag[] = [];
-      if (!taskId && listId) {
+      if (!parentId && listId) {
         try {
           availableTags = await getSpaceTags(config.clickup.defaultSpace || '');
         } catch (error) {
@@ -117,11 +121,11 @@ export const add = new Command('add')
       }
 
       // Create the task
-      if (taskId) {
+      if (parentId) {
         const task = await createSubtask(
-          taskId,
+          parentId,
           name,
-          description ? sanitizeText(description) : undefined,
+          description ? sanitizeText(description) : '',
           Number(priority),
           status
         );
@@ -145,7 +149,7 @@ export const add = new Command('add')
         const task = await createTask(
           listId,
           name,
-          description || '',  // Provide empty string if description is undefined
+          description ? sanitizeText(description) : '',
           Number(priority),
           status
         );

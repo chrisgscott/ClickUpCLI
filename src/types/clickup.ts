@@ -42,7 +42,7 @@ export interface Task {
   priority: Priority;
   url: string;
   tags: Tag[];
-  parent?: {
+  parent?: string | {
     id: string;
   };
   subtasks?: Task[];

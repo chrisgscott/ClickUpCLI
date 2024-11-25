@@ -62,10 +62,11 @@ interface TasksResponse {
 
 interface CreateTaskData {
   name: string;
-  description: string;
-  priority: number;
-  status: string;
+  description?: string;
+  priority?: number | null;
+  status?: string;
   due_date?: number;
+  parent?: string | null;
 }
 
 interface CreateTagData {
@@ -74,59 +75,87 @@ interface CreateTagData {
   tag_fg: string;
 }
 
+// Add a delay utility function
+const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+// Add retry logic utility
+async function retry<T>(
+  operation: () => Promise<T>,
+  retries = 3,
+  delayMs = 1000
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (retries === 0) throw error;
+    await delay(delayMs);
+    return retry(operation, retries - 1, delayMs);
+  }
+}
+
 export async function createTask(
   listId: string,
   name: string,
   description: string,
-  priority: number,
-  status: string,
-  dueDate?: string
+  priority?: number,
+  status?: string,
+  dueDate?: string,
+  parent?: string
 ): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
   const taskData: CreateTaskData = {
     name,
     description,
-    priority,
-    status,
+    priority: priority || null,
+    status: status || undefined
   };
 
   if (dueDate) {
     taskData.due_date = new Date(dueDate).getTime();
   }
 
+  if (parent) {
+    taskData.parent = parent;
+  }
+
+  console.log('Creating task with:', JSON.stringify(taskData, null, 2));
+  console.log('List ID:', listId);
+
   const response = await axiosInstance.post<Task>(`/list/${listId}/task`, taskData);
+  console.log('API Response:', JSON.stringify(response.data, null, 2));
   return response.data;
 }
 
 export async function createSubtask(
   parentId: string,
   name: string,
-  description?: string,
+  description: string,
   priority?: number,
   status?: string
 ): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
+  const config = await getConfig();
   
-  // First get the parent task to get its list ID
-  const parentTask = await getTask(parentId);
-  if (!parentTask.list?.id) {
-    throw new Error('Parent task does not have a valid list ID');
+  if (!config.clickup?.defaultList) {
+    throw new Error('Default list not set. Please run "task config --interactive" first.');
   }
 
   const payload = {
     name,
     description,
-    parent: parentId,  
-    priority: priority ? PRIORITY_MAP[priority] : undefined,
-    status: status
+    parent: parentId,
+    priority: priority || undefined,
+    status: status || undefined
   };
 
-  const response = await axiosInstance.post<{ data: Task }>(
-    `/list/${parentTask.list.id}/task`,
-    payload
-  );
-
-  return response.data.data;
+  // Add retry logic and delay for API consistency
+  return retry(async () => {
+    const response = await axiosInstance.post<Task>(
+      `/list/${config.clickup.defaultList}/task`,
+      payload
+    );
+    return response.data;
+  });
 }
 
 export async function listTasks(listId?: string): Promise<Task[]> {
@@ -139,92 +168,60 @@ export async function listTasks(listId?: string): Promise<Task[]> {
 
   const axiosInstance = await getAxiosInstance();
   
-  // Get all tasks including subtasks
-  const query = new URLSearchParams({
-    subtasks: 'true',
-    include_closed: 'true',
-    order_by: 'created',
-    reverse: 'true'
-  }).toString();
+  return retry(async (): Promise<Task[]> => {
+    // Get all tasks including subtasks with expanded fields
+    const query = new URLSearchParams({
+      subtasks: 'true',
+      include_closed: 'true',
+      order_by: 'created',
+      reverse: 'true',
+      include_subtasks: 'true'
+    }).toString();
 
-  const response = await axiosInstance.get<TasksResponse>(
-    `/list/${targetListId}/task?${query}`
-  );
+    const response = await axiosInstance.get<TasksResponse>(
+      `/list/${targetListId}/task?${query}`
+    );
 
-  // Create a map of tasks by ID for quick lookup and track subtasks
-  const tasksById = new Map<string, Task>();
-  const subtaskIds = new Set<string>();
+    // Create a map of tasks by ID for quick lookup
+    const tasksById = new Map<string, Task>();
 
-  // First pass: Initialize all tasks
-  for (const task of response.data.tasks) {
-    tasksById.set(task.id, { ...task, subtasks: [] });
-    if (task.parent?.id) {
-      subtaskIds.add(task.id);
-    }
-  }
+    // First pass: Initialize all tasks
+    response.data.tasks.forEach(task => {
+      tasksById.set(task.id, {
+        ...task,
+        subtasks: []
+      });
+    });
 
-  // Second pass: Build task hierarchy
-  for (const task of response.data.tasks) {
-    if (task.parent?.id) {
-      const parentTask = tasksById.get(task.parent.id);
-      if (parentTask) {
-        parentTask.subtasks = parentTask.subtasks || [];
-        parentTask.subtasks.push(tasksById.get(task.id)!);
+    // Second pass: Build task hierarchy
+    response.data.tasks.forEach(task => {
+      const parentId = typeof task.parent === 'string' ? task.parent : task.parent?.id;
+      if (parentId) {
+        const parentTask = tasksById.get(parentId);
+        if (parentTask && parentTask.subtasks) {
+          parentTask.subtasks.push(tasksById.get(task.id)!);
+        }
       }
-    }
-  }
+    });
 
-  // Get root tasks (tasks that are not subtasks)
-  const rootTasks = Array.from(tasksById.values()).filter(task => !subtaskIds.has(task.id));
-
-  // Sort root tasks by creation date (newest first)
-  rootTasks.sort((a, b) => {
-    const aDate = new Date(a.date_created || 0);
-    const bDate = new Date(b.date_created || 0);
-    return bDate.getTime() - aDate.getTime();
+    // Return only root tasks (tasks without parents)
+    return Array.from(tasksById.values()).filter(task => !task.parent);
   });
-
-  return rootTasks;
 }
 
 export async function getTask(taskId: string): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
   
-  try {
-    // Get task details including subtasks
+  return retry(async () => {
+    // Add query parameters to include subtasks
     const query = new URLSearchParams({
       include_subtasks: 'true',
       custom_fields: 'true'
     }).toString();
 
-    const response = await axiosInstance.get<Task>(
-      `/task/${taskId}?${query}`
-    );
-
-    // Check if we got a valid response
-    if (!response.data || typeof response.data !== 'object') {
-      throw new Error('Invalid response from ClickUp API');
-    }
-
-    // Check if task has subtasks and fetch them
-    if (response.data.subtasks) {
-      const subtasks = await listSubtasks(taskId);
-      response.data.subtasks = subtasks;
-    }
-
+    const response = await axiosInstance.get<Task>(`/task/${taskId}?${query}`);
     return response.data;
-  } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: { status?: number, data?: { message?: string } } };
-      if (axiosError.response?.status === 404) {
-        throw new Error(`Task with ID ${taskId} not found`);
-      } else if (axiosError.response?.status === 401) {
-        throw new Error('Unauthorized. Please check your ClickUp API token');
-      }
-    }
-    // For all other errors, throw a generic error message
-    throw error;
-  }
+  });
 }
 
 export async function updateTask(taskId: string, updates: UpdateTaskParams): Promise<Task> {

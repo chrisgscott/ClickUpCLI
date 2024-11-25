@@ -47,8 +47,8 @@ task list --priority high
 # List tasks with specific tag
 task list --tag "bug"
 
-# List subtasks of a specific task
-task list --task abc123
+# List all tasks including subtasks (subtasks will be indented under their parent tasks)
+task list
 
 # Interactive task listing and management
 task list --interactive
@@ -65,8 +65,11 @@ task add "Update API docs" --description "Add examples for new endpoints" --prio
 # Create task with status and tags
 task add "Refactor auth" --status "in progress" --tags "backend,security"
 
-# Create a subtask
-task add "Write tests" --parent abc123 --priority normal
+# Create a subtask (use -t or --parent to specify the parent task ID)
+task add "Write tests" -t abc123 --description "Unit tests for auth module" --priority 2 --status "backlog"
+
+# Alternative way to create a subtask using long form
+task add "Write tests" --parent abc123 --description "Unit tests for auth module" --priority 2 --status "backlog"
 
 # Interactive task creation
 task add --interactive
