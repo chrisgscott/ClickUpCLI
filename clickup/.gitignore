@@ -1,0 +1,14 @@
+# Ignore all files in exports directory (except README)
+exports/*
+!exports/README.md
+
+# Ignore archived exports
+exports/archive/*
+!exports/archive/README.md
+
+# Ignore archived imports
+imports/archive/*
+!imports/archive/README.md
+
+# Don't ignore import templates and examples
+!imports/*.example.yml
