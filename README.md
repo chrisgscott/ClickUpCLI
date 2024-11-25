@@ -163,6 +163,49 @@ task apply --file changes.yml --dry-run
 task export --format yaml > current-config.yml
 ```
 
+#### Bulk Task Creation
+```bash
+# Apply tasks from a YAML file
+task apply -f tasks.yml
+
+# Preview changes without applying them
+task apply -f tasks.yml --dry-run
+```
+
+Example YAML structure for bulk task creation:
+```yaml
+tasks:
+  - name: "Project Setup"
+    description: "Initial project setup and configuration"
+    priority: 2          # 1: urgent, 2: high, 3: normal, 4: low
+    status: "to do"
+    due_date: "2024-03-15"
+    subtasks:
+      - name: "Environment Setup"
+        description: "Set up development environment"
+        priority: 2
+        status: "to do"
+        subtasks:
+          - name: "Install Dependencies"
+            description: "Install and configure project dependencies"
+            priority: 3
+            status: "to do"
+          - name: "Configure Tools"
+            description: "Set up development tools"
+            priority: 3
+            status: "to do"
+      - name: "Documentation"
+        description: "Create initial documentation"
+        priority: 3
+        status: "to do"
+```
+
+The YAML file supports:
+- Unlimited nesting of subtasks
+- Task properties: name, description, priority, status, due_date
+- Automatic parent-child relationship handling
+- Bulk creation of entire task hierarchies
+
 ### Backup Management
 
 Backups are automatically created in `~/.task-cli/backups` before applying any changes. Each backup is timestamped and contains the complete configuration at that point.

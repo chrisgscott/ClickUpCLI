@@ -21,11 +21,35 @@ export const apply = new Command('apply')
         fg_color: "#FFFFFF"  # Text color
     
     tasks:
-      - name: "Implement feature"
-        description: "Feature description"
-        priority: 3          # 1: urgent, 2: high, 3: normal, 4: low
-        status: "backlog"
-        due_date: "2024-02-15"  # Optional, format: YYYY-MM-DD
+      - name: "Project Setup"
+        description: "Initial project setup"
+        priority: 2          # 1: urgent, 2: high, 3: normal, 4: low
+        status: "to do"
+        due_date: "2024-03-15"  # Optional, format: YYYY-MM-DD
+        subtasks:           # Optional list of subtasks
+          - name: "Environment Setup"
+            description: "Set up development environment"
+            priority: 2
+            status: "to do"
+            subtasks:     # Supports unlimited nesting of subtasks
+              - name: "Install Dependencies"
+                description: "Install project dependencies"
+                priority: 3
+                status: "to do"
+
+  Task Properties:
+    - name: Required, string
+    - description: Optional, string
+    - priority: Optional, number (1: urgent, 2: high, 3: normal, 4: low)
+    - status: Optional, string
+    - due_date: Optional, string (format: YYYY-MM-DD)
+    - subtasks: Optional, array of tasks with the same properties
+
+  Features:
+    - Unlimited nesting of subtasks
+    - Automatic parent-child relationship handling
+    - Bulk creation of entire task hierarchies
+    - Preview changes with --dry-run option
 
   A backup of the current configuration will be created before applying changes.
   `)
