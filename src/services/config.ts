@@ -3,10 +3,10 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import chalk from 'chalk';
-import { createTask, getListStatuses, getSpaceTags, createTag, manageStatus } from './clickup.js';
+import { createTask, getListStatuses, getSpaceTags, createTag, manageStatus, listTasks, updateTask, updateTaskTags } from './clickup.js';
 import { getConfig } from '../config/store.js';
 import { BulkConfig, ValidationError, TaskConfig, TagConfig } from '../types/config.js';
-import { Task } from '../types/clickup.js';
+import { Task, UpdateTaskParams } from '../types/clickup.js';
 
 const CONFIG_DIR = join(homedir(), '.task-cli');
 const BACKUP_DIR = join(CONFIG_DIR, 'backups');
@@ -153,80 +153,112 @@ async function applyTaskChanges(tasks: TaskConfig[], dryRun: boolean = false): P
     throw new Error('Default list ID must be configured. Please run "task-cli config" first.');
   }
 
-  // Capture the validated listId for use in the closure
   const validatedListId: string = listId;
 
-  // Helper function to create a task and its subtasks recursively
-  async function createTaskWithSubtasks(task: TaskConfig, parentId?: string, level: number = 0): Promise<void> {
+  // Helper function to find a task by name in a list
+  async function findTaskByName(name: string, parentId?: string): Promise<Task | null> {
+    try {
+      const tasks = await listTasks(validatedListId);
+      return tasks.find(t => t.name === name && t.parent === parentId) || null;
+    } catch (error) {
+      console.error(chalk.yellow(`Warning: Could not search for existing task "${name}"`));
+      return null;
+    }
+  }
+
+  // Helper function to create or update a task and its subtasks recursively
+  async function processTask(task: TaskConfig, parentId?: string, level: number = 0): Promise<void> {
     if (dryRun) {
       const indent = '  '.repeat(level);
-      console.log(chalk.blue(`${indent}Would create task: ${task.name}`));
+      const existingTask = await findTaskByName(task.name, parentId);
+      const action = existingTask ? 'Update' : 'Create';
+      console.log(chalk.blue(`${indent}Would ${action.toLowerCase()} task: ${task.name}`));
       if (task.description) console.log(chalk.blue(`${indent}  Description: ${task.description}`));
       console.log(chalk.blue(`${indent}  Priority: ${task.priority}`));
       console.log(chalk.blue(`${indent}  Status: ${task.status}`));
       if (task.due_date) console.log(chalk.blue(`${indent}  Due Date: ${task.due_date}`));
+      if (task.tags?.length) console.log(chalk.blue(`${indent}  Tags: ${task.tags.join(', ')}`));
       
-      // Recursively show subtasks in dry run mode
       if (task.subtasks?.length) {
         for (const subtask of task.subtasks) {
-          await createTaskWithSubtasks(subtask, undefined, level + 1);
+          await processTask(subtask, existingTask?.id, level + 1);
         }
       }
       return;
     }
 
     try {
-      console.log(chalk.blue(`Creating task: ${task.name}`));
-      const taskData = {
-        name: task.name,
-        description: task.description || '',
-        priority: task.priority,
-        status: task.status || undefined,
-        due_date: task.due_date,
-        parent: parentId
-      };
-      console.log('Task data:', JSON.stringify(taskData, null, 2));
+      const existingTask = await findTaskByName(task.name, parentId);
+      let resultTask: Task;
 
-      // Create task with retry logic
-      const createdTask = await retry<Task>(async () => {
-        // Validate required fields
-        if (!task.name || typeof task.name !== 'string') {
-          throw new Error('Task name is required and must be a string');
+      if (existingTask) {
+        console.log(chalk.blue(`Updating task: ${task.name}`));
+        const updates: UpdateTaskParams = {
+          name: task.name,
+          description: task.description,
+          priority: task.priority,
+          status: task.status,
+          due_date: task.due_date ? new Date(task.due_date).getTime() : undefined
+        };
+
+        resultTask = await retry<Task>(async () => {
+          return await updateTask(existingTask.id, updates);
+        });
+        console.log(chalk.green(`Updated task: ${task.name} (ID: ${resultTask.id})`));
+
+        // Update tags if specified
+        if (task.tags?.length) {
+          console.log(chalk.blue(`Updating tags for task: ${task.name}`));
+          await retry<Task>(async () => {
+            return await updateTaskTags(resultTask.id, task.tags || []);
+          });
+          console.log(chalk.green(`Updated tags for task: ${task.name}`));
         }
-        if (typeof task.priority !== 'number') {
-          throw new Error('Task priority is required and must be a number');
-        }
+      } else {
+        console.log(chalk.blue(`Creating task: ${task.name}`));
+        resultTask = await retry<Task>(async () => {
+          if (!task.name || typeof task.name !== 'string') {
+            throw new Error('Task name is required and must be a string');
+          }
+          if (typeof task.priority !== 'number') {
+            throw new Error('Task priority is required and must be a number');
+          }
 
-        // Prepare data with proper type assertions
-        const name: string = task.name;
-        const description = task.description || '';
-        const status = task.status || undefined;
+          const name: string = task.name;
+          const description = task.description || '';
+          const status = task.status || undefined;
 
-        return await createTask(
-          validatedListId,
-          name,
-          description,
-          task.priority,
-          status,
-          task.due_date || undefined,
-          parentId || undefined
-        );
-      });
+          const createdTask = await createTask(
+            validatedListId,
+            name,
+            description,
+            task.priority,
+            status,
+            task.due_date || undefined,
+            parentId || undefined
+          );
 
-      console.log(chalk.green(`Created task: ${task.name} (ID: ${createdTask.id})`));
+          // Set tags if specified
+          if (task.tags?.length) {
+            console.log(chalk.blue(`Setting tags for task: ${task.name}`));
+            await updateTaskTags(createdTask.id, task.tags);
+          }
 
-      // If task has subtasks, create them recursively
+          return createdTask;
+        });
+        console.log(chalk.green(`Created task: ${task.name} (ID: ${resultTask.id})`));
+      }
+
       if (task.subtasks?.length) {
-        console.log(chalk.blue(`\nFound ${task.subtasks.length} subtasks for: ${task.name}`));
+        console.log(chalk.blue(`\nProcessing ${task.subtasks.length} subtasks for: ${task.name}`));
         
-        // Process subtasks sequentially with delays
         for (const subtask of task.subtasks) {
-          await delay(1000); // Add delay between subtask creation
-          await createTaskWithSubtasks(subtask, createdTask.id, level + 1);
+          await delay(1000);
+          await processTask(subtask, resultTask.id, level + 1);
         }
       }
     } catch (error) {
-      console.error(chalk.red(`Failed to create task ${task.name}:`));
+      console.error(chalk.red(`Failed to process task ${task.name}:`));
       if (error instanceof Error) {
         console.error(chalk.red('Error message:', error.message));
         console.error(chalk.red('Error stack:', error.stack));
@@ -236,9 +268,8 @@ async function applyTaskChanges(tasks: TaskConfig[], dryRun: boolean = false): P
     }
   }
 
-  // Process each top-level task
   for (const task of tasks) {
-    await createTaskWithSubtasks(task, undefined, 0);
+    await processTask(task, undefined, 0);
   }
 }
 

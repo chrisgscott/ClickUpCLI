@@ -63,6 +63,7 @@ export interface UpdateTaskParams {
   priority?: number;
   status?: string;
   tags?: string[];
+  due_date?: number;
 }
 
 export interface Workspace {

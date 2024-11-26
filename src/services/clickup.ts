@@ -338,11 +338,11 @@ export async function deleteTag(spaceId: string, name: string): Promise<void> {
 
 export async function updateTaskTags(taskId: string, tags: string[]): Promise<Task> {
   const axiosInstance = await getAxiosInstance();
-  const response = await axiosInstance.put<{ data: Task }>(
-    `/task/${taskId}`,
+  const response = await axiosInstance.post<Task>(
+    `/task/${taskId}/tag`,
     { tags }
   );
-  return response.data.data;
+  return response.data;
 }
 
 export async function manageStatus(
